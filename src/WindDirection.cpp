@@ -14,6 +14,8 @@ WindDirection::WindDirection(WindReading &w, bool s) : w_calc(w), simulate(s), e
 {
     sinBuffer = new uint16_t[BUFFER_SIZE];
     cosBuffer = new uint16_t[BUFFER_SIZE];
+    memset(sinBuffer, 0, sizeof(uint16_t)*BUFFER_SIZE);
+    memset(cosBuffer, 0, sizeof(uint16_t)*BUFFER_SIZE);
 }
 
 WindDirection::~WindDirection()
@@ -22,13 +24,34 @@ WindDirection::~WindDirection()
     delete cosBuffer;
 }
 
-void read_it(uint16_t v, uint16_t * buf, uint8_t &ix, uint32_t &s)
+#define read_it(v, buf, ix, s) \
+{ uint16_t old = buf[ix]; \
+buf[ix] = v; \
+s = s - old + v; \
+ix = (ix + 1) % BUFFER_SIZE; }
+
+void sim_values(uint16_t &s, uint16_t &c, unsigned long now_micros, double &expected)
 {
-    uint16_t old = buf[ix];
-    buf[ix] = v;
-    s = s - old + v;
-    ix = (ix + 1) % BUFFER_SIZE;
+    static Range sim_sin(SIMUL_RANGE_SIN_LOW, SIMUL_RANGE_SIN_HIGH, 0);
+    static Range sim_cos(SIMUL_RANGE_COS_LOW, SIMUL_RANGE_COS_HIGH, 0);
+    unsigned long t = now_micros / 1000L;
+    static unsigned long t0 = t;
+    unsigned long dt = t - t0;
+    t0 = t;
+    if (dt > 0)
+    {
+        double incr = 6.0 * (dt / 1000.0);
+        static double deg = 0;
+        deg = (deg + incr);
+        deg = (deg > 360.0) ? (deg - 360.0) : deg;
+        double v_sin = sin(to_radians(deg));
+        double v_cos = cos(to_radians(deg));
+        s = to_digital(v_sin, -1, 1, sim_sin) + get_noise(sim_sin.size() * 0.05);
+        c = to_digital(v_cos, -1, 1, sim_cos) + get_noise(sim_cos.size() * 0.05);
+        expected = deg;
+    }
 }
+
 
 void WindDirection::loop_micros(uint64_t now_micros)
 {
@@ -36,35 +59,29 @@ void WindDirection::loop_micros(uint64_t now_micros)
     uint16_t i_cos = 0;
     if (simulate)
     {
-        static Range sim_sin(SIMUL_RANGE_SIN_LOW, SIMUL_RANGE_SIN_HIGH, 0);
-        static Range sim_cos(SIMUL_RANGE_COS_LOW, SIMUL_RANGE_COS_HIGH, 0);
-        unsigned long t = now_micros / 1000L;
-        static unsigned long t0 = t;
-        unsigned long dt = t - t0;
-        t0 = t;
-        if (dt > 0)
-        {
-            double incr = 6.0 * (dt / 1000.0);
-            static double deg = 0;
-            deg = (deg + incr);
-            deg = (deg > 360.0) ? (deg - 360.0) : deg;
-            double v_sin = sin(to_radians(deg));
-            double v_cos = cos(to_radians(deg));
-            i_sin = to_digital(v_sin, -1, 1, sim_sin) + get_noise(sim_sin.size() * 0.05);
-            i_cos = to_digital(v_cos, -1, 1, sim_cos) + get_noise(sim_cos.size() * 0.05);
-            expected = deg;
-        }
+        //sim_values(i_sin, i_cos, now_micros, expected);
+        i_sin = 2319;
+        i_cos = 1650;
     }
     else
     {
         i_sin = analogRead(SIN_PIN);
         i_cos = analogRead(COS_PIN);
     }
-    if (i_cos || i_sin)
-    {
-        read_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
-        read_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
-    }
+ /*
+
+    uint16_t old = sinBuffer[ix_buffer_sin];
+    sinBuffer[ix_buffer_sin] = i_sin;
+    sumSin = sumSin - old + i_sin;
+    ix_buffer_sin = (ix_buffer_sin + 1) % BUFFER_SIZE;
+
+    old = cosBuffer[ix_buffer_cos];
+    cosBuffer[ix_buffer_cos] = i_cos;
+    sumCos = sumCos - old + i_cos;
+    ix_buffer_cos = (ix_buffer_cos + 1) % BUFFER_SIZE;
+  */  
+    read_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
+    read_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
 }
 
 void WindDirection::setup()
@@ -74,8 +91,7 @@ void WindDirection::setup()
     // for Rayarine, the output is 2V-6V, hence we need a x3 divider, bringing the range to 667mv-2000mV
     analogSetPinAttenuation(SIN_PIN, adc_attenuation_t::ADC_11db);
     analogSetPinAttenuation(COS_PIN, adc_attenuation_t::ADC_11db);
-    memset(sinBuffer, 0, sizeof(uint16_t)*BUFFER_SIZE);
-    memset(cosBuffer, 0, sizeof(uint16_t)*BUFFER_SIZE);
+
 }
 
 void WindDirection::get_sincos(uint16_t &i_sin, uint16_t &i_cos)

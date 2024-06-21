@@ -13,6 +13,7 @@
 #include <N2K.h>
 #include <EEPROM.h>
 #include <BTInterface.h>
+#include <N2K.h>
 #include "WindReading.h"
 #include "WindCalibration.h"
 #include "WindCalibrationDummy.h"
@@ -23,8 +24,8 @@
 #include "Conf.h"
 
 #define MAX_BLE_DATA_BUFFER_SIZE 128
-#define N2K_ENABLED false
-#define SIMUL false
+#define N2K_ENABLED true
+#define SIMUL true
 
 // 12 bit ADC for ESP32
 #define MAX_ADC_VALUE 4095
@@ -34,16 +35,18 @@
 #define RANGE_DEFAULT_VALID 1024
 
 // milliseconds
-#define N2K_PERIOD 200
+#define N2K_PERIOD 500
 #define BLE_PERIOD 200
 // microsecond
-#define MAIN_LOOP_PERIOD 10000
+#define MAIN_LOOP_PERIOD 500
+
+void on_n2k_source(unsigned char old_src, unsigned char new_src);
 
 Conf conf(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX, RANGE_DEFAULT_VALID);
-N2K &n2k = *N2K::get_instance(NULL, NULL);
+N2K &n2k = *N2K::get_instance(NULL, on_n2k_source);
 WindReading wind;
 WindDirection wind_direction(wind, SIMUL);
-WindSpeed wind_speed(SIMUL);
+WindSpeed wind_speed(SIMUL, MAIN_LOOP_PERIOD);
 WindCalibrationDummy calibration_sin(MAX_ADC_RANGE);
 WindCalibrationDummy calibration_cos(MAX_ADC_RANGE);
 Wind360 w360;
@@ -56,6 +59,14 @@ hw_timer_t *timer = NULL;
 void IRAM_ATTR on_timer()
 {
   wind_speed.loop_micros();
+  wind_direction.loop_micros(0);
+}
+
+void on_n2k_source(unsigned char old_src, unsigned char new_src)
+{
+  Log::trace("[N2K] Source changed from {%d} to {%d}\n", old_src, new_src);
+  conf.n2k_source = new_src;
+  conf.write();
 }
 
 struct wind_data
@@ -81,18 +92,26 @@ void on_setting_write(int handle, const char *value)
     if (value[0] == 'O')
     {
       Log::trace("[CAL] Setting offset {%s}\n", value);
-      if (strlen(value)>2)
+      if (strlen(value)>1)
       {
         const char* s = (value+sizeof(char));
         int32_t offset = 0;
         if (atoi_x(offset, s))
         {
+          Log::trace("[CAL] New offset {%d}\n", offset);
           conf.offset = offset;
           conf.write();
           wind.set_offset(offset);
         }
+        else
+        {
+          Log::trace("[CAL] Invalid offset\n");
+        }
       }
-      Log::trace("[CAL] Invalid offset\n");
+      else
+      {
+        Log::trace("[CAL] Invalid offset\n");
+      }
     }
     else if (value[0] == 'S' && calibrating == 0)
     {
@@ -193,6 +212,14 @@ void setup()
   Serial.begin(115200);
   msleep(1000);
 
+  // initialize n2k
+  if (N2K_ENABLED)
+  {
+    n2k.set_desired_source(conf.n2k_source);
+    n2k.add_pgn(130306L);
+    n2k.setup();
+  }
+
   // initialize CPU frequency
   uint32_t f = getCpuFrequencyMhz();
   bool res_cpu_freq = setCpuFrequencyMhz(80);
@@ -202,7 +229,7 @@ void setup()
   // read configuration from eeprom
   conf.read();
   wind.load_calibration(conf.sin_range, conf.cos_range);
-  wind.set_offset(151 /*conf.offset*/);
+  wind.set_offset(conf.offset);
 
   // initialize bluetooth
   bt.add_setting("command", "c3fe2075-ac6c-40bf-8073-73a110453725");
@@ -218,14 +245,6 @@ void setup()
 
   // initialize led
   led.setup();
-
-  // initialize n2k
-  if (N2K_ENABLED)
-  {
-    n2k.set_desired_source(conf.n2k_source);
-    n2k.add_pgn(130306L);
-    n2k.setup();
-  }
 
   timer = timerBegin(0, 80, true); // Timer 0, clock divider 80
   timerAttachInterrupt(timer, &on_timer, true); // Attach the interrupt handling function
@@ -347,25 +366,24 @@ void loop()
   static wind_data wdata;
   unsigned long t = micros();
 
-  wdata.offset = conf.offset;
-  wind_direction.loop_micros(t);
-
   static unsigned long t0 = t;
 
-  if ((t - t0) > 100000L || (t < t0)) // 1/10 second
+  if ((t - t0) > 500000L || (t < t0)) // 5/10 second
   {
     t0 = t;
     unsigned long t_ms = t / 1000L;
+
+    wdata.offset = conf.offset;
 
     // read wind
     read_wind_direction(wdata);
     read_wind_speed(wdata);
 
-    Log::trace("[APP] Wind direction BLE {%d} [%d/%d %5.1f/%5.1f] Dir {%5.1f} Err {%.1f} ErrCode {%d} Speed {%.1f} ErrCodeSpeed {%d} ",
+    Log::trace("[APP] Wind direction BLE {%d} [%d/%d %5.1f/%5.1f] Dir {%5.1f} Err {%.1f} ErrCode {%d} Speed {%.1f} Freq {%.1f} ErrCodeSpeed {%d} ",
                bt.clients(),
                wdata.i_sin, wdata.i_cos, wind_direction.get_expected(), wind_direction.get_expected() - wdata.angle,
                wdata.angle, wdata.err, wdata.error,
-               wdata.speed, wdata.error_speed);
+               wdata.speed, wdata.freq, wdata.error_speed);
     if (calibrating)
     {
       Log::trace("{%02d/%02d/%02d} {", w360.progress(), w360.size(), w360.buffer_size());

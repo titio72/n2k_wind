@@ -7,13 +7,11 @@ bool Conf::write()
 {
   if (EEPROM.begin(sizeof(*this)))
   {
-    Log::trace("[CONF] Writing calibration: sin {%d %d} cos {%d %d}\n",
-               sin_range.low(), sin_range.high(), cos_range.low(), cos_range.high());
+    Log::trace("[CONF] Writing calibration: sin {%d %d} cos {%d %d} offset {%d}\n",
+               sin_range.low(), sin_range.high(), cos_range.low(), cos_range.high(), offset);
     EEPROM.put(0, *this);
-    if (!EEPROM.commit())
-    {
-      Log::trace("[CONF] Error writing calibration\n");
-    }
+    bool res = EEPROM.commit();
+    Log::trace("[CONF] Calibration written {%d}\n", res);
     EEPROM.end();
     return true;
   }
@@ -33,7 +31,7 @@ bool Conf::read()
     {
       EEPROM.get(0, *this);
       read = true;
-      Log::trace("[CAL] Read calibration: sin {%d %d} cos {%d %d}\n", sin_range.low(), sin_range.high(), cos_range.low(), cos_range.high());
+      Log::trace("[CAL] Read calibration: sin {%d %d} cos {%d %d} offset {%d}\n", sin_range.low(), sin_range.high(), cos_range.low(), cos_range.high(), offset);
       // configuration is good
     }
     EEPROM.end();
