@@ -1,12 +1,13 @@
 #ifndef _WIND_DIRECTION_H
 #define _WIND_DIRECTION_H
 #include <stdint.h>
-#include "WindReading.h"
+#include "SinCosDecoder.h"
+#include "WindAngleSImulator.h"
 
 class WindDirection
 {
 public:
-    WindDirection(WindReading &wcalc, bool simulate);
+    WindDirection(SinCosDecoder &wcalc, bool simulate);
     ~WindDirection();
 
     void get_sincos(uint16_t &sin, uint16_t &cos);
@@ -19,7 +20,8 @@ public:
     void loop_micros(uint64_t now_micros);
 
 private:
-    WindReading &w_calc;
+    WindAngleSimulator simulator;
+    SinCosDecoder &w_calc;
     bool simulate;
     double expected;
     uint16_t *sinBuffer, *cosBuffer;

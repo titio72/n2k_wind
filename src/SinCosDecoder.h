@@ -4,11 +4,11 @@
 #include <stdlib.h>
 #include "WindUtil.h"
 
-class WindReading
+class SinCosDecoder
 {
 public:
-WindReading();
-~WindReading();
+SinCosDecoder();
+~SinCosDecoder();
 
 double set_reading(uint16_t sin, uint16_t cos);
 
@@ -20,7 +20,15 @@ void set_offset(double degree);
 Range get_sin_calibration();
 Range get_cos_calibration();
 
+void sim_values(uint16_t &s, uint16_t &c, unsigned long now_micros, double &expected);
+
 private:
+    double get_sim_angle(unsigned long now_micros);
+    Range sim_sin;
+    Range sim_cos;
+    double sim_deg;
+    unsigned long sim_t0;
+
     Range sin_calibration;
     Range cos_calibration;
     double angle;

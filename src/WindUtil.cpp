@@ -69,6 +69,7 @@ uint16_t to_digital(double value, double v_low, double v_high, Range range)
 
 double norm_deg(double d)
 {
+    d = d - (int)(d/360)*360;
     if (d<0) return d + 360.0;
     else return d;
 }

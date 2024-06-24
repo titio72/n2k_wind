@@ -14,7 +14,7 @@
 #include <EEPROM.h>
 #include <BTInterface.h>
 #include <N2K.h>
-#include "WindReading.h"
+#include "SinCosDecoder.h"
 #include "WindCalibration.h"
 #include "WindCalibrationDummy.h"
 #include "WindSpeed.h"
@@ -40,26 +40,35 @@
 // microsecond
 #define MAIN_LOOP_PERIOD 500
 
+#define BLE_DEVICE_UUID "32890585-c6ee-498b-9e7a-044baefb6542"
+#define BLE_COMMAND_UUID "c3fe2075-ac6c-40bf-8073-73a110453725"
+#define BLE_CONF_UUID "c04a9b9c-3ab6-4cce-9b59-1b582112e693"
+#define BLE_WIND_DATA_UUID "003d0cab-70f7-43ac-8ab9-db26466572af"
+#define BLE_CALIBRATION_DATA_UUID "a267cdc3-9868-42ed-9a77-70ee04542d38"
+
 void on_n2k_source(unsigned char old_src, unsigned char new_src);
 
 Conf conf(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX, RANGE_DEFAULT_VALID);
 N2K &n2k = *N2K::get_instance(NULL, on_n2k_source);
-WindReading wind;
-WindDirection wind_direction(wind, SIMUL);
+SinCosDecoder sincos_decoder;
+WindDirection wind_direction(sincos_decoder, SIMUL);
 WindSpeed wind_speed(SIMUL, MAIN_LOOP_PERIOD);
 WindCalibrationDummy calibration_sin(MAX_ADC_RANGE);
 WindCalibrationDummy calibration_cos(MAX_ADC_RANGE);
 Wind360 w360;
 LedDriver led;
-BTInterface bt("32890585-c6ee-498b-9e7a-044baefb6542", "Wind");
+BTInterface bt(BLE_DEVICE_UUID, "Wind");
 bool calibrating = false;
 
 hw_timer_t *timer = NULL;
 
+// ESP32 hw timer callback
 void IRAM_ATTR on_timer()
 {
-  wind_speed.loop_micros();
+  #if SIMUL == false
+  wind_speed.loop_micros(0);
   wind_direction.loop_micros(0);
+  #endif
 }
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src)
@@ -85,124 +94,151 @@ struct wind_data
   double freq;
 };
 
-void on_setting_write(int handle, const char *value)
+void command_set_offset(const char *command_value)
 {
-  if (handle == 0 && value)
+  Log::trace("[CAL] Setting offset {%s}\n", command_value);
+  if (command_value[0])
   {
-    if (value[0] == 'O')
+    int32_t offset = 0;
+    if (atoi_x(offset, command_value))
     {
-      Log::trace("[CAL] Setting offset {%s}\n", value);
-      if (strlen(value)>1)
-      {
-        const char* s = (value+sizeof(char));
-        int32_t offset = 0;
-        if (atoi_x(offset, s))
-        {
-          Log::trace("[CAL] New offset {%d}\n", offset);
-          conf.offset = offset;
-          conf.write();
-          wind.set_offset(offset);
-        }
-        else
-        {
-          Log::trace("[CAL] Invalid offset\n");
-        }
-      }
-      else
-      {
-        Log::trace("[CAL] Invalid offset\n");
-      }
-    }
-    else if (value[0] == 'S' && calibrating == 0)
-    {
-      Log::trace("[CAL] Setting manual calibration {%s}\n", value);
-      int i_tok = 0;
-      int32_t vv[] = {-1, -1, -1, -1};
-      bool do_write = false;
-      char s[256];
-      strcpy(s, value + sizeof(char)); // skip first char
-      char *t, *p;
-      for (t = mystrtok(&p, s, '|'); t && i_tok < 4; t = mystrtok(&p, 0, '|'))
-      {
-        if (strlen(t))
-        {
-          parse_value(vv[i_tok], t, MAX_ADC_VALUE);
-        }
-        i_tok++;
-      }
-      Log::trace("[CAL] Read manual cal values {%d %d %d %d}\n", vv[0], vv[1], vv[2], vv[3]);
-      if (vv[0] >= 0 && vv[1] >= 0 && vv[2] >= 0 && vv[3] >= 0)
-      {
-        Range s_range((uint16_t)vv[0], (uint16_t)vv[1], RANGE_DEFAULT_VALID);
-        Range c_range((uint16_t)vv[2], (uint16_t)vv[3], RANGE_DEFAULT_VALID);
-        if (c_range.valid() && s_range.valid())
-        {
-          conf.sin_range.set(s_range);
-          conf.cos_range.set(c_range);
-          wind.load_calibration(conf.sin_range, conf.cos_range);
-          conf.write();
-        }
-        else
-        {
-          Log::trace("[CAL] Manual calibration invalid\n");
-        }
-      }
-      bt.set_setting_value(0, "R");
-    }
-    else if (strcmp("A", value) == 0 && calibrating)
-    {
-      // abort calibration
-      Log::trace("[CAL] Abort calibration\n");
-      calibrating = false;
-      bt.set_setting_value(0, "R");
-    }
-    else if (strcmp("R", value) == 0 && calibrating)
-    {
-      // finalize calibration
-      if (w360.is_valid())
-      {
-        Log::trace("[CAL] Complete calibration\n");
-        calibrating = false;
-        bool cal_sin_ok = calibration_sin.calibrate();
-        bool cal_cos_ok = calibration_cos.calibrate();
-        if (cal_sin_ok && cal_cos_ok)
-        {
-          conf.sin_range.set(calibration_sin.get_calibrated());
-          conf.cos_range.set(calibration_cos.get_calibrated());
-          wind.load_calibration(conf.sin_range, conf.cos_range);
-          conf.write();
-        }
-        else
-        {
-          Log::trace("[CAL] Invalid ranges to complete calibration\n");
-        }
-      }
-      else
-      {
-        Log::trace("[CAL] Not enough data to complete calibration\n");
-        calibrating = false;
-      }
-    }
-    else if (strcmp("C", value) == 0 && calibrating == 0)
-    {
-      Log::trace("[CAL] Entering calibration\n");
-      calibrating = true;
-      calibration_sin.reset();
-      calibration_cos.reset();
-      w360.reset();
-    }
-    else if (strcmp("X", value) == 0 && calibrating == 0)
-    {
-      Log::trace("[CAL] Reset calibration to default\n");
-      conf.sin_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);
-      conf.cos_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);
-      wind.load_calibration(conf.sin_range, conf.cos_range);
+      Log::trace("[CAL] New offset {%d}\n", offset);
+      conf.offset = offset;
       conf.write();
-      bt.set_setting_value(0, "R");
+      sincos_decoder.set_offset(offset);
     }
     else
     {
-      // nothing to do
+      Log::trace("[CAL] Invalid offset\n");
+    }
+  }
+  else
+  {
+    Log::trace("[CAL] Invalid offset\n");
+  }
+}
+
+void command_set_calibration(const char *command_value)
+{
+  Log::trace("[CAL] Setting manual calibration {%s}\n", command_value);
+  int i_tok = 0;
+  int32_t vv[] = {-1, -1, -1, -1};
+  bool do_write = false;
+  char s[256];
+  strcpy(s, command_value);
+  char *t, *p;
+  for (t = mystrtok(&p, s, '|'); t && i_tok < 4; t = mystrtok(&p, 0, '|'))
+  {
+    if (strlen(t))
+    {
+      parse_value(vv[i_tok], t, MAX_ADC_VALUE);
+    }
+    i_tok++;
+  }
+  Log::trace("[CAL] Read manual cal values {%d %d %d %d}\n", vv[0], vv[1], vv[2], vv[3]);
+  if (vv[0] >= 0 && vv[1] >= 0 && vv[2] >= 0 && vv[3] >= 0)
+  {
+    Range s_range((uint16_t)vv[0], (uint16_t)vv[1], RANGE_DEFAULT_VALID);
+    Range c_range((uint16_t)vv[2], (uint16_t)vv[3], RANGE_DEFAULT_VALID);
+    if (c_range.valid() && s_range.valid())
+    {
+      conf.sin_range.set(s_range);
+      conf.cos_range.set(c_range);
+      sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+      conf.write();
+    }
+    else
+    {
+      Log::trace("[CAL] Manual calibration invalid\n");
+    }
+  }
+  bt.set_setting_value(0, "R");
+}
+
+void command_finalize_calibration()
+{
+  // finalize calibration
+  if (w360.is_valid())
+  {
+    Log::trace("[CAL] Complete calibration\n");
+    calibrating = false;
+    bool cal_sin_ok = calibration_sin.calibrate();
+    bool cal_cos_ok = calibration_cos.calibrate();
+    if (cal_sin_ok && cal_cos_ok)
+    {
+      conf.sin_range.set(calibration_sin.get_calibrated());
+      conf.cos_range.set(calibration_cos.get_calibrated());
+      sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+      conf.write();
+    }
+    else
+    {
+      Log::trace("[CAL] Invalid ranges to complete calibration\n");
+    }
+  }
+  else
+  {
+    Log::trace("[CAL] Not enough data to complete calibration\n");
+    calibrating = false;
+  }
+}
+
+void command_factory_reset()
+{
+  Log::trace("[CAL] Reset calibration to default\n");
+  conf.sin_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);
+  conf.cos_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);
+  conf.offset = 0;
+  sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+  conf.write();
+  bt.set_setting_value(0, "R");
+}
+
+void command_abort_calibration()
+{
+  Log::trace("[CAL] Abort calibration\n");
+  calibrating = false;
+  bt.set_setting_value(0, "R");
+}
+
+void command_start_calibration()
+{
+  Log::trace("[CAL] Entering calibration\n");
+  calibrating = true;
+  calibration_sin.reset();
+  calibration_cos.reset();
+  w360.reset();
+}
+
+void on_command(int handle, const char *value)
+{
+  if (handle == 0 && value && value[0])
+  {
+    const char command = value[0];
+    const char *command_value = (value + sizeof(char));
+    switch (command)
+    {
+    case 'O': // Set offset
+      command_set_offset(command_value);
+      break;
+    case 'S': // Set manual calibration
+      command_set_calibration(command_value);
+      break;
+    case 'A': // Abort calibration
+      command_abort_calibration();
+      break;
+    case 'R': // Finalize calibration
+      command_finalize_calibration();
+      break;
+    case 'C': // Start calibration
+      command_start_calibration();
+      break;
+    case 'X': // Calibration factory reset
+      command_factory_reset();
+      break;
+    default:
+      Log::trace("[CAL] Unrecognized command {%s}\n", value);
+      break;
     }
   }
 }
@@ -228,16 +264,16 @@ void setup()
 
   // read configuration from eeprom
   conf.read();
-  wind.load_calibration(conf.sin_range, conf.cos_range);
-  wind.set_offset(conf.offset);
+  sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+  sincos_decoder.set_offset(conf.offset);
 
   // initialize bluetooth
-  bt.add_setting("command", "c3fe2075-ac6c-40bf-8073-73a110453725");
-  bt.add_setting("conf", "c04a9b9c-3ab6-4cce-9b59-1b582112e693");
-  bt.add_field("wind", "003d0cab-70f7-43ac-8ab9-db26466572af");
-  bt.add_field("calibration", "a267cdc3-9868-42ed-9a77-70ee04542d38");
+  bt.add_setting("command", BLE_COMMAND_UUID);
+  bt.add_setting("conf", BLE_CONF_UUID);
+  bt.add_field("wind", BLE_WIND_DATA_UUID);
+  bt.add_field("calibration", BLE_CALIBRATION_DATA_UUID);
   bt.setup();
-  bt.set_write_callback(on_setting_write);
+  bt.set_write_callback(on_command);
   bt.begin();
 
   wind_speed.setup();
@@ -246,10 +282,10 @@ void setup()
   // initialize led
   led.setup();
 
-  timer = timerBegin(0, 80, true); // Timer 0, clock divider 80
+  timer = timerBegin(1, 80, true);              // Timer 0, clock divider 80
   timerAttachInterrupt(timer, &on_timer, true); // Attach the interrupt handling function
-  timerAlarmWrite(timer, 1000, true); // Interrupt every 1ms
-  timerAlarmEnable(timer); // Enable the alarm
+  timerAlarmWrite(timer, 1000, true);           // Interrupt every 1ms
+  timerAlarmEnable(timer);                      // Enable the alarm
 
   Log::trace("[APP] Setup done\n");
 }
@@ -312,7 +348,7 @@ void send_BLE(const wind_data &wd, unsigned long time)
     addShort(data, offset, conf.cos_range.high());
     addShort(data, offset, i_speed);
     addInt(data, offset, wd.error_speed);
-    addInt(data, offset, conf.offset); // added a the end for compatibility with UI
+    addInt(data, offset, conf.offset);   // added a the end for compatibility with UI
     bt.set_field_value(0, data, offset); // hope ofset<MAX_BLE_DATA_BUFFER_SIZE
 
     bt.set_setting_value(0, calibrating ? "CAL" : "RUN");
@@ -365,6 +401,12 @@ void loop()
 {
   static wind_data wdata;
   unsigned long t = micros();
+
+  #if SIMUL == true
+  wind_speed.set_apparent_wind_angle(wdata.angle);
+  wind_speed.loop_micros(t);
+  wind_direction.loop_micros(t);
+  #endif
 
   static unsigned long t0 = t;
 

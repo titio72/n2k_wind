@@ -15,7 +15,9 @@ public:
 
     void setup();
 
-    void loop_micros();
+    void loop_micros(unsigned long now_micros);
+
+    void set_apparent_wind_angle(double deg);
 
 private:
     bool simulate;
@@ -26,6 +28,10 @@ private:
     uint16_t *buffer;
     uint32_t buffer_ix;
     uint16_t tick_micros;
+
+    // used for simulation
+    double apparent_wind_angle;
+    unsigned long sim_period;
 };
 
 #endif

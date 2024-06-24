@@ -2,49 +2,54 @@
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
-#include "WindReading.h"
+#include "SinCosDecoder.h"
 
 #define SIN_COS_VALIDITY_THRESHOLD 0.2
 
+#define MAX_ANALOG_VALUE 4095
+#define MIN_ANALOG_VALUE 0
+
 #pragma region WIND
-WindReading::WindReading(): sin_calibration(0, 4095, 0), cos_calibration(0, 4095, 0), angle(NAN), error(WIND_ERROR_OK), offset(0.0)
+SinCosDecoder::SinCosDecoder():
+    sin_calibration(MIN_ANALOG_VALUE, MAX_ANALOG_VALUE, 0), cos_calibration(MIN_ANALOG_VALUE, MAX_ANALOG_VALUE, 0),
+    angle(NAN), error(WIND_ERROR_OK), offset(0.0)
 {}
 
-WindReading::~WindReading()
+SinCosDecoder::~SinCosDecoder()
 {}
 
-double WindReading::get_angle()
+double SinCosDecoder::get_angle()
 {
     return angle;
 }
 
-int WindReading::get_error()
+int SinCosDecoder::get_error()
 {
     return error;
 }
 
-Range WindReading::get_cos_calibration()
+Range SinCosDecoder::get_cos_calibration()
 {
     return cos_calibration;
 }
 
-Range WindReading::get_sin_calibration()
+Range SinCosDecoder::get_sin_calibration()
 {
     return sin_calibration;
 }
 
-void WindReading::load_calibration(const Range &s_range, const Range &c_range)
+void SinCosDecoder::load_calibration(const Range &s_range, const Range &c_range)
 {
     sin_calibration.set(s_range);
     cos_calibration.set(c_range);
 }
 
-void WindReading::set_offset(double o)
+void SinCosDecoder::set_offset(double o)
 {
     offset = o;
 }
 
-double WindReading::set_reading(uint16_t sin_reading, uint16_t cos_reading)
+double SinCosDecoder::set_reading(uint16_t sin_reading, uint16_t cos_reading)
 {
     double v_sin = to_analog(sin_reading, -1, 1, sin_calibration);
     double v_cos = to_analog(cos_reading, -1, 1, cos_calibration);
@@ -61,8 +66,9 @@ double WindReading::set_reading(uint16_t sin_reading, uint16_t cos_reading)
     }
     return check;
 }
-#pragma endregion
 
+
+#pragma endregion
 
 #ifndef ESP32_ARCH
 int16_t sd, cd;
@@ -108,7 +114,7 @@ private:
 };
 #pragma endregion
 
-double test(double deg, WindReading& w)
+double test(double deg, SinCosDecoder& w)
 {
     double a = radians(deg);
     sd = to_digital(sin(a), -1, 1, w.get_sin_calibration());
@@ -122,7 +128,7 @@ double test(double deg, WindReading& w)
 
 int main() {
     Deltas deltas;
-    WindReading wind;
+    SinCosDecoder wind;
 
     int i = 0;
     while (1)

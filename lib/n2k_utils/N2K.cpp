@@ -161,7 +161,7 @@ void N2K::setup()
         if (pgns) NMEA2000->ExtendTransmitMessages(pgns);
         static_initialized = NMEA2000->Open();
         stats.canbus = static_initialized;
-        Log::trace("[N2K] N2K initialized {%s}\n", is_initialized() ? "OK" : "KO");
+        Log::trace("[N2K] N2K initialized {%s}\n", static_initialized ? "OK" : "KO");
     }
     else
     {
