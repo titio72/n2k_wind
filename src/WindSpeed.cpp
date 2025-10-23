@@ -1,30 +1,31 @@
 #include <Arduino.h>
 #include "WindSpeed.h"
 
-#define ON_THRESHOLD 3072
-#define OFF_THRESHOLD 128
-// number of times the counter ticks (every 1ms)
-#define ZERO_THRESHOLD_MICROS 1000000
-#define SIM_PERIOD_MICROS 30000
 
-#define BUFFER_SIZE 5
+/*
+The vane are r=55mm from the center, so a full round is 2*pi*r
+With a frequency of f HZ (there are 4 magnets, so 2 transitions per round, hence the round per seconds are f/2),
+it makes a total distance of L=(f/2)*2*pi*r in 1 second, hence the speed in knots is L*3600/1852.
+This is assuming that there is no friction - let's assume that the rotation speed is 50% of.
+The magic number to convert Hz in Knots is 2*(pi*0.055*2600/1852) = 0.672
 
-#define SPEED_FACTOR 1.3
+Raymarine sats that 20Hz (10Hz considering a full revolution) is 20Knots, which would mean a factor of 1.0
+*/
 
-WindSpeed::WindSpeed(bool sim, uint32_t t_mics) : simulate(sim), frequency(0.0), state(STATE_UNKNOWN), counter(0), buffer_ix(0), period_micros(0), tick_micros(t_mics), sim_period(SIM_PERIOD_MICROS)
+#define HZ_TO_KNOTS 0.672f
+
+WindSpeed::WindSpeed(bool sim) : simulate(sim), frequency(0.0), state(LOW), hz_to_knots(1.0), last_read_time(0)
 {
-  buffer = new uint16_t[BUFFER_SIZE];
-  memset(buffer, 0, sizeof(uint16_t) * BUFFER_SIZE);
 }
 
 WindSpeed::~WindSpeed()
 {
-  delete buffer;
 }
 
-void WindSpeed::get_speed(double &s, double &f, int &e)
+void WindSpeed::get_speed(double &s, double &f, int &e, unsigned long t)
 {
-  if (period_micros==0)
+  unsigned long delta_t = t - last_read_time;
+  if (counter==0 || delta_t<=0 || last_period<2000) 
   {
     s = 0.0;
     f = 0.0;
@@ -32,83 +33,46 @@ void WindSpeed::get_speed(double &s, double &f, int &e)
   }
   else
   {
-    // assume 2 magnets, so the number of revolution is frequency/2
-    // each revolution is 2*PI*6cm so, assuming the cups moves as fast as the wind (not true, they will be slower),
-    // wind speed in m/s is 2*PI*0.06*(f/2) = PI*0.06/f = PI*0.06*(10E6/p) with p the period in micros
-    // we add a SPEED_FACTOR to compensate for the loss of speed of the cups (so SPEED_FACTOR>1.00)
-    f = (1000000.0 / period_micros);
-    s = (f * 0.06 * PI  * SPEED_FACTOR) * 3600.0 / 1852.0;
+    //f = (1000000.0 / delta_t) * counter;
+    f = last_period ? (double)delta_t / (double)last_period : 0.0;
+    s = f * hz_to_knots;
     e = 0;
+    counter = 0;
   }
+  last_read_time = t;
 }
 
-volatile uint32_t c = 0;
-uint16_t sim_reading(uint32_t tick_micros, unsigned long sim_period)
+void WindSpeed::set_speed_adjustment(double f)
 {
-  c++;
-  if ((c*tick_micros)<=sim_period)
-  {
-    return OFF_THRESHOLD;
-  }
-  else if ((c*tick_micros)<=(sim_period*2))
-  {
-    return ON_THRESHOLD;
-  }
-  else
-  {
-    c = 0;
-    return 25;
-  }
-}
-
-int calc_new_state(uint16_t v, uint16_t *buf, uint32_t &ix)
-{
-  buf[ix] = v;
-  ix = (ix + 1) % BUFFER_SIZE;
-
-  bool new_state_up = true;
-  bool new_state_down = true;
-  for (int i = 0; i<BUFFER_SIZE; i++)
-  {
-    new_state_up = new_state_up && (v>=ON_THRESHOLD);
-    new_state_down = new_state_down && (v<=OFF_THRESHOLD);
-  }
-  return new_state_up?STATE_UP:(new_state_down?STATE_DOWN:STATE_UNKNOWN);
+  hz_to_knots = HZ_TO_KNOTS * f;
 }
 
 void WindSpeed::set_apparent_wind_angle(double deg)
 {
   apparent_wind_angle = deg;
-  double c = cos(radians(deg));
-  double w = 7.0 /*true wind m/s*/ + 3 /* boat speed m/s*/ * c;
-  sim_period = (unsigned long)(1000000 / (w / 0.06 / PI) / SPEED_FACTOR);
 }
 
 // the time is in micros!
-void WindSpeed::loop_micros(unsigned long time_micros)
+void WindSpeed::loop_micros(unsigned long t)
 {
-  uint16_t v = simulate?sim_reading(tick_micros, sim_period):analogRead(SPEED_PIN);
-  int new_state = calc_new_state(v, buffer, buffer_ix);
-  if (new_state != STATE_UNKNOWN && new_state != state)
-  {
-    state = new_state;
-    if (state == STATE_UP)
-    {
-      period_micros = counter * tick_micros;
-      counter = 0;
-    }
-  }
-  counter++;
+  if (last_state_change_time==0) last_state_change_time = t;
 
-  if ((counter*tick_micros) > ZERO_THRESHOLD_MICROS)
+  int new_state = digitalRead(SPEED_PIN);
+  if (new_state!=state)
   {
-    // assuming it's not spinning
-    counter = 0;
-    period_micros = 0;
+    last_period = t - last_state_change_time;
+    last_state_change_time = t;
+    counter++;
+    state = new_state;
+  }
+  else if ((t-last_state_change_time) > 1000000L) // 1 second of no change
+  {
+    last_period = 0;
+    last_state_change_time = t;
   }
 }
 
 void WindSpeed::setup()
 {
-  analogSetPinAttenuation(SPEED_PIN, adc_attenuation_t::ADC_11db);
+  pinMode(SPEED_PIN, INPUT);
 }

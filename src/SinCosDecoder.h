@@ -10,10 +10,12 @@ public:
 SinCosDecoder();
 ~SinCosDecoder();
 
-double set_reading(uint16_t sin, uint16_t cos);
+void set_reading(uint16_t sin, uint16_t cos);
 
 double get_angle();
 int get_error();
+double get_ellipse();
+
 void load_calibration(const Range &sin_range, const Range &cos_range);
 void set_offset(double degree);
 
@@ -33,6 +35,7 @@ private:
     Range cos_calibration;
     double angle;
     double offset;
+    double ellipse;
     int error;
 };
 

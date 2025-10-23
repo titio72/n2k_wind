@@ -28,6 +28,11 @@ int SinCosDecoder::get_error()
     return error;
 }
 
+double SinCosDecoder::get_ellipse()
+{
+    return ellipse;
+}
+
 Range SinCosDecoder::get_cos_calibration()
 {
     return cos_calibration;
@@ -49,22 +54,13 @@ void SinCosDecoder::set_offset(double o)
     offset = o;
 }
 
-double SinCosDecoder::set_reading(uint16_t sin_reading, uint16_t cos_reading)
+void SinCosDecoder::set_reading(uint16_t sin_reading, uint16_t cos_reading)
 {
     double v_sin = to_analog(sin_reading, -1, 1, sin_calibration);
     double v_cos = to_analog(cos_reading, -1, 1, cos_calibration);
-    double check = sqrt(v_sin * v_sin + v_cos * v_cos);
-    if (abs(1.0 - check)<SIN_COS_VALIDITY_THRESHOLD)
-    {
-        angle = norm_deg(to_degrees(atan2(v_sin, v_cos)) + offset);
-        error = WIND_ERROR_OK;
-    }
-    else
-    {
-        angle = norm_deg(to_degrees(atan2(v_sin, v_cos)) + offset); //NAN
-        error = WIND_ERROR_NO_CAL_OR_SIGNAL;
-    }
-    return check;
+    ellipse = sqrt(v_sin * v_sin + v_cos * v_cos);
+    angle = norm_deg(to_degrees(atan2(v_sin, v_cos)) + offset);
+    error = (abs(1.0 - ellipse)<SIN_COS_VALIDITY_THRESHOLD)?WIND_ERROR_OK:WIND_ERROR_NO_CAL_OR_SIGNAL;
 }
 
 

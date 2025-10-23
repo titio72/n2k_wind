@@ -12,9 +12,6 @@ class BLECharacteristicCallbacks;
 class BLEServerCallbacks;
 class Configuration;
 
-
-typedef void (*setting_write_callback)(int, const char*);
-
 class ABBLEWriteCallback {
 public:
     virtual void on_write(int handle, const char* value) = 0;
@@ -44,14 +41,14 @@ public:
 
 class BTInterface {
     public:
-        BTInterface(const char* uuid, const char* device_name = NULL);
+        BTInterface(const char* uuid, const char* device_name);
         ~BTInterface();
         void setup();
         void begin();
         void loop(unsigned long ms);
 
-        void add_setting(const char* name, const char* uuid);
-        void add_field(const char* name, const char* uuid);
+        int add_setting(const char* name, const char* uuid);
+        int add_field(const char* name, const char* uuid);
 
         void set_setting_value(int handle, const char* value);
         void set_setting_value(int handle, int value);
@@ -60,10 +57,8 @@ class BTInterface {
         void set_field_value(int handle, void* value, int len);
 
         void set_write_callback(ABBLEWriteCallback* cback) { callback = cback; }
-        void set_write_callback(setting_write_callback cback);
 
-        bool is_connected();
-        int clients();
+        void set_device_name(const char* name);
 
     private:
         char device_name[16];
@@ -74,7 +69,6 @@ class BTInterface {
         BLEServerCallbacks* serverCBack;
 
         ABBLEWriteCallback* callback;
-        ABBLEWriteCallback* callback_wrapper;
 
         std::vector<ABBLEField> fields;
         std::vector<ABBLESetting> settings;

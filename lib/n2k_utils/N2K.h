@@ -42,8 +42,10 @@ class N2K {
 
         void add_pgn(unsigned long pgns);
 
+        static void set_sent_message_callback(void (*_MsgHandler)(const tN2kMsg &N2kMsg, bool success));
+
     private:
-        N2K(void (*_MsgHandler)(const tN2kMsg &N2kMsg), void (*_src_handler)(const unsigned char old_s, const unsigned char new_s));
+        N2K();
         tNMEA2000* NMEA2000;
         char socket_name[32];
         unsigned char desired_source;

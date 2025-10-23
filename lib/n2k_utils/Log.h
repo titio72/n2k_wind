@@ -16,6 +16,9 @@ class Log {
 public:
 	static void debug(const char* text, ...);
 	static void trace(const char* text, ...);
+	static void debugx(const char* module, const char* action, const char* text, ...);
+	static void tracex(const char* module, const char* action, const char* text, ...);
+	static void tracex(const char* module, const char* action);
 
 	static void setdebug();
 };

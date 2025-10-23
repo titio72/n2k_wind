@@ -13,7 +13,7 @@ public:
     void get_sincos(uint16_t &sin, uint16_t &cos);
     double get_expected();
 
-    void get_angle(uint16_t &i_sin, uint16_t &i_cos, double &angle, double &err, int &error);
+    void get_angle(uint16_t &i_sin, uint16_t &i_cos, double &angle, double &ellipse, int &error);
 
     void setup();
 
@@ -28,8 +28,4 @@ private:
     uint8_t ix_buffer_sin, ix_buffer_cos;
     uint32_t sumSin, sumCos;
 };
-
-
-
-
 #endif

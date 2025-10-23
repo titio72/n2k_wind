@@ -8,10 +8,10 @@
 class WindSpeed
 {
 public:
-    WindSpeed(bool simulate, uint32_t tick_microseconds);
+    WindSpeed(bool simulate);
     ~WindSpeed();
 
-    void get_speed(double &speed, double &frequency, int &error);
+    void get_speed(double &speed, double &frequency, int &error, unsigned long t);
 
     void setup();
 
@@ -19,19 +19,25 @@ public:
 
     void set_apparent_wind_angle(double deg);
 
+    void set_speed_adjustment(double f);
+
+    unsigned long counter = 0;
+
 private:
     bool simulate;
     double frequency;
-    volatile int state;
-    volatile uint64_t counter;
-    volatile uint64_t period_micros;
-    uint16_t *buffer;
-    uint32_t buffer_ix;
-    uint16_t tick_micros;
+    int state;
+    double hz_to_knots;
 
     // used for simulation
     double apparent_wind_angle;
     unsigned long sim_period;
+
+    unsigned long last_read_time = 0;
+
+    unsigned long last_period = 0;
+    unsigned long last_state_change_time = 0;
+
 };
 
 #endif

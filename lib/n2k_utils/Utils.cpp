@@ -9,6 +9,17 @@
 #include <sys/sysinfo.h>
 #endif
 
+unsigned long check_elapsed(ulong time, ulong &last_time, ulong period)
+{
+  ulong dT = time - last_time;
+  if (dT>=period || dT<0)
+  {
+    last_time = time;
+    return dT;
+  }
+  return 0;
+}
+
 
 bool startswith(const char* str_to_find, const char* str)
 {
@@ -90,7 +101,7 @@ void f1000(char* buf, unsigned long l, int& length)
   {
     length += sprintf(buf + length, "%lu", l);
   }
-  else 
+  else
   {
     f1000(buf, l/1000, length);
     length += sprintf(buf + length, ",%03lu", l%1000);
@@ -142,7 +153,7 @@ char * replace(char const * const original, char const * const pattern, char con
 
   if (returned != NULL)
   {
-    // copy the original string, 
+    // copy the original string,
     // replacing all the instances of the pattern
     char * retptr = returned;
     for (oriptr = original; (patloc = strstr(oriptr, pattern)); oriptr = patloc + patlen)
@@ -151,7 +162,7 @@ char * replace(char const * const original, char const * const pattern, char con
       // copy the section until the occurence of the pattern
       strncpy(retptr, oriptr, skplen);
       retptr += skplen;
-      // copy the replacement 
+      // copy the replacement
       strncpy(retptr, replacement, replen);
       retptr += replen;
     }
@@ -206,6 +217,14 @@ int getDaysSince1970(int y, int m, int d) {
 
     // return difference between two counts
     return (n2 - n1);
+}
+
+const char* time_to_ISO(time_t t, int millis)
+{
+  static char buf[32];
+  strftime(buf, sizeof "2011-10-08T07:07:09.000Z", "%FT%T", gmtime(&t));
+  sprintf(buf + 19, ".%03dZ", millis);
+  return buf;
 }
 
 bool array_contains(short test, short* int_set, int set_size) {
