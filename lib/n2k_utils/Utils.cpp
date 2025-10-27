@@ -9,6 +9,11 @@
 #include <sys/sysinfo.h>
 #endif
 
+double lpf(double value, double previous_value, double alpha)
+{
+    return previous_value * (1 - alpha) + value * alpha;
+}
+
 unsigned long check_elapsed(ulong time, ulong &last_time, ulong period)
 {
   ulong dT = time - last_time;

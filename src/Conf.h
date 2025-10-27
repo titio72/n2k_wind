@@ -13,7 +13,7 @@ public:
         sin_range(def_l, def_h, validity), // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
         cos_range(def_l, def_h, validity), // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
         offset(0),
-        smoothing(0), // 0..255 0==no smoothing - 255 = max smoothing
+        speed_smoothing(0), // 0..255 0==no smoothing - 255 = max smoothing. Not used yet
         speed_adjustment(0.672f * 100), // factor to convert Hz to knots, multiplied by 100 to have 2 decimals
         n2k_source(23)
   {
@@ -23,8 +23,9 @@ public:
   Range sin_range;
   Range cos_range;
   int16_t offset;
-  int8_t smoothing;
-  int8_t speed_adjustment;
+  uint8_t speed_smoothing;
+  uint8_t angle_smoothing;
+  uint8_t speed_adjustment;
   uint8_t n2k_source;
 
   bool write();

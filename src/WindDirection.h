@@ -7,25 +7,27 @@
 class WindDirection
 {
 public:
-    WindDirection(SinCosDecoder &wcalc, bool simulate);
+    WindDirection(SinCosDecoder &wcalc, wind_data &data);
     ~WindDirection();
 
-    void get_sincos(uint16_t &sin, uint16_t &cos);
     double get_expected();
-
-    void get_angle(uint16_t &i_sin, uint16_t &i_cos, double &angle, double &ellipse, int &error);
 
     void setup();
 
-    void loop_micros(uint64_t now_micros);
+    void loop(unsigned long milliseconds);
+
+    void loop_micros(unsigned long now_micros);
+
+    unsigned long get_sample_age() { return last_read_time; }
 
 private:
-    WindAngleSimulator simulator;
     SinCosDecoder &w_calc;
-    bool simulate;
+    wind_data &wd;
     double expected;
     uint16_t *sinBuffer, *cosBuffer;
-    uint8_t ix_buffer_sin, ix_buffer_cos;
-    uint32_t sumSin, sumCos;
+    uint16_t ix_buffer_sin, ix_buffer_cos;
+    double sumSin, sumCos;
+
+    unsigned long last_read_time = 0;
 };
 #endif

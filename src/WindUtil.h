@@ -7,8 +7,27 @@
 
 #define to_radians(angleInDegrees) ((angleInDegrees) * M_PI / 180.0)
 #define to_degrees(angleInRadians) ((angleInRadians) * 180.0 / M_PI)
-#define max(v1, v2) ((v1<v2)?v2:v1)
-#define min(v1, v2) ((v1<v2)?v1:v2)
+#define max(v1, v2) ((v1 < v2) ? v2 : v1)
+#define min(v1, v2) ((v1 < v2) ? v1 : v2)
+
+struct wind_data
+{
+    // angle data
+    double angle = 0.0;
+    double ellipse = 1.0;
+    int error = WIND_ERROR_NO_CAL_OR_SIGNAL;
+    uint16_t i_sin = 0;
+    uint16_t i_cos = 0;
+    uint16_t offset = 0;
+
+    // speed data
+    double speed = 0.0;
+    double frequency = 0.0;
+    int error_speed = WIND_ERROR_NO_CAL_OR_SIGNAL;
+
+    double angle_smoothing_factor = 1.0;
+    double speed_smoothing_factor = 1.0;
+};
 
 class Range
 {
@@ -39,20 +58,20 @@ double norm_deg(double d);
 
 int16_t norm_deg(int16_t d);
 
-double get_angle_deg(int16_t sin_reading, Range& sin_calibration, int16_t cos_reading, Range& cos_calibration);
+double get_angle_deg(int16_t sin_reading, Range &sin_calibration, int16_t cos_reading, Range &cos_calibration);
 
 int16_t get_noise(int16_t amplitude);
 
-char *mystrtok(char **m,char *s,char c);
+char *mystrtok(char **m, char *s, char c);
 
-bool atoi_x(int32_t& value, const char* s_value);
+bool atoi_x(int32_t &value, const char *s_value);
 
 bool parse_value(int32_t &target_value, const char *s_value, uint16_t max_value);
 
-void addInt(uint8_t* dest, int &offset, uint32_t data32);
+void addInt(uint8_t *dest, int &offset, uint32_t data32);
 
-void addShort(uint8_t* dest, int &offset, uint16_t data16);
+void addShort(uint8_t *dest, int &offset, uint16_t data16);
 
-void addChar(uint8_t* dest, int &offset, uint8_t data8);
+void addChar(uint8_t *dest, int &offset, uint8_t data8);
 
 #endif

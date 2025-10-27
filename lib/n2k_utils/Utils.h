@@ -38,5 +38,6 @@ int msleep(long msec);
 unsigned long get_free_mem();
 unsigned long check_elapsed(ulong time, ulong &last_time, ulong period);
 void format_thousands_sep(char* buffer, long l);
+double lpf(double value, double previous_value, double alpha);
 
 #endif

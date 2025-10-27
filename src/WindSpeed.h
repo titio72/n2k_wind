@@ -1,43 +1,39 @@
 #ifndef _WIND_SPEED_H
 #define _WIND_SPEED_H
 
-#define STATE_UP 1
-#define STATE_DOWN -1
-#define STATE_UNKNOWN 0
+#define SMOOTHING_BUFFER_SIZE 32
+
+struct wind_data;
 
 class WindSpeed
 {
 public:
-    WindSpeed(bool simulate);
+    WindSpeed(wind_data &wind_data);
     ~WindSpeed();
 
-    void get_speed(double &speed, double &frequency, int &error, unsigned long t);
+    unsigned long get_sample_age() { return last_read_time; }
 
     void setup();
 
-    void loop_micros(unsigned long now_micros);
+    void loop(unsigned long milliseconds);
 
-    void set_apparent_wind_angle(double deg);
+    void loop_micros(unsigned long now_micros);
 
     void set_speed_adjustment(double f);
 
-    unsigned long counter = 0;
-
 private:
-    bool simulate;
-    double frequency;
-    int state;
+    unsigned long last_read_time = 0;
     double hz_to_knots;
 
-    // used for simulation
-    double apparent_wind_angle;
-    unsigned long sim_period;
-
-    unsigned long last_read_time = 0;
-
-    unsigned long last_period = 0;
+    unsigned long counter = 0;
+    int state = LOW;
     unsigned long last_state_change_time = 0;
 
+    unsigned long period = 0;
+    double smooth_period = 0.0;
+    double smooth_counter = 0.0;
+    
+    wind_data &data;
 };
 
 #endif

@@ -3,9 +3,9 @@
 #include "WindDirection.h"
 #include "WindUtil.h"
 
-#define BUFFER_SIZE 100
+#define BUFFER_SIZE 400 // about 0.4s averaging at 1ms rate 
 
-WindDirection::WindDirection(SinCosDecoder &w, bool s) : simulator(), w_calc(w), simulate(s), expected(0.0), ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
+WindDirection::WindDirection(SinCosDecoder &w, wind_data &d) : w_calc(w), wd(d), expected(0.0), ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
 {
     sinBuffer = new uint16_t[BUFFER_SIZE];
     cosBuffer = new uint16_t[BUFFER_SIZE];
@@ -19,7 +19,7 @@ WindDirection::~WindDirection()
     delete cosBuffer;
 }
 
-void inline read_it(uint16_t v, uint16_t *buf, uint8_t &ix, uint32_t &s)
+void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s)
 {
     uint16_t old = buf[ix];
     buf[ix] = v;
@@ -27,22 +27,15 @@ void inline read_it(uint16_t v, uint16_t *buf, uint8_t &ix, uint32_t &s)
     ix = (ix + 1) % BUFFER_SIZE;
 }
 
-void WindDirection::loop_micros(uint64_t now_micros)
+void WindDirection::loop_micros(unsigned long now_micros) // this is called from an ISR every 1ms
 {
     uint16_t i_sin = 0;
     uint16_t i_cos = 0;
-    if (simulate)
-    {
-        simulator.sim_values(i_sin, i_cos, now_micros, expected);
-    }
-    else
-    {
-        i_sin = analogRead(SIN_PIN);
-        i_cos = analogRead(COS_PIN);
-        expected = NAN;
-    }
-    read_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
-    read_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
+    i_sin = analogRead(SIN_PIN);
+    i_cos = analogRead(COS_PIN);
+    expected = NAN;
+    buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
+    buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
 }
 
 void WindDirection::setup()
@@ -54,22 +47,18 @@ void WindDirection::setup()
     analogSetPinAttenuation(COS_PIN, adc_attenuation_t::ADC_11db);
 }
 
-void WindDirection::get_sincos(uint16_t &i_sin, uint16_t &i_cos)
-{
-    i_cos = (uint16_t)((double)sumCos / BUFFER_SIZE + 0.5);
-    i_sin = (uint16_t)((double)sumSin / BUFFER_SIZE + 0.5);
-}
-
 double WindDirection::get_expected()
 {
     return expected;
 }
 
-void WindDirection::get_angle(uint16_t &i_sin, uint16_t &i_cos, double &angle, double &ellipse, int &error)
+void WindDirection::loop(unsigned long milliseconds)
 {
-    get_sincos(i_sin, i_cos);
-    w_calc.set_reading(i_sin, i_cos);
-    ellipse = w_calc.get_ellipse();
-    angle = w_calc.get_angle();
-    error = w_calc.get_error();
+    wd.i_cos = (uint16_t)(sumCos / BUFFER_SIZE + 0.5);
+    wd.i_sin = (uint16_t)(sumSin / BUFFER_SIZE + 0.5);
+    w_calc.set_reading(wd.i_sin, wd.i_cos);
+    wd.ellipse = w_calc.get_ellipse();
+    wd.angle = w_calc.get_angle();
+    wd.error = w_calc.get_error();
+    last_read_time = milliseconds;
 }

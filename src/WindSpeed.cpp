@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "WindSpeed.h"
-
+#include "WindUtil.h"
+#include "Utils.h"
 
 /*
 The vane are r=55mm from the center, so a full round is 2*pi*r
@@ -12,9 +13,10 @@ The magic number to convert Hz in Knots is 2*(pi*0.055*2600/1852) = 0.672
 Raymarine sats that 20Hz (10Hz considering a full revolution) is 20Knots, which would mean a factor of 1.0
 */
 
-#define HZ_TO_KNOTS 0.672f
+#define HZ_TO_KNOTS 0.672f // use 0.672f for ST50
+//#define HZ_TO_KNOTS 1.000f // use 1.000f for ST60
 
-WindSpeed::WindSpeed(bool sim) : simulate(sim), frequency(0.0), state(LOW), hz_to_knots(1.0), last_read_time(0)
+WindSpeed::WindSpeed(wind_data &d) : hz_to_knots(HZ_TO_KNOTS), data(d)
 {
 }
 
@@ -22,24 +24,28 @@ WindSpeed::~WindSpeed()
 {
 }
 
-void WindSpeed::get_speed(double &s, double &f, int &e, unsigned long t)
+void WindSpeed::loop(unsigned long milliseconds)
 {
-  unsigned long delta_t = t - last_read_time;
-  if (counter==0 || delta_t<=0 || last_period<2000) 
+  unsigned long dt = milliseconds - last_read_time;
+  last_read_time = milliseconds;
+  //if (counter==0 || period<2000) 
+  //{
+  //  data.speed = 0.0;
+  //  data.frequency = 0.0;
+  //  data.error = WIND_ERROR_OK;
+  //}
+  //else
   {
-    s = 0.0;
-    f = 0.0;
-    e = 0;
-  }
-  else
-  {
-    //f = (1000000.0 / delta_t) * counter;
-    f = last_period ? (double)delta_t / (double)last_period : 0.0;
-    s = f * hz_to_knots;
-    e = 0;
+    double alpha = 0.5/*data.speed_smoothing_factor*/;
+    //smooth_period = (double)period; // * alpha + smooth_period * (1.0 - alpha);
+    //data.frequency = (smooth_period>0) ? (1000000.0 / smooth_period) * 2.0 : 0.0;
+    smooth_counter = (double)counter * alpha + smooth_counter * (1.0 - alpha);
+    //data.frequency = (smooth_counter>0) ? (smooth_counter * 1000.0 / (double)dt) * 2.0 : 0.0;
+    data.frequency = (smooth_counter * 4.0);
+    data.speed = data.frequency * hz_to_knots;
+    data.error_speed = WIND_ERROR_OK;
     counter = 0;
   }
-  last_read_time = t;
 }
 
 void WindSpeed::set_speed_adjustment(double f)
@@ -47,12 +53,7 @@ void WindSpeed::set_speed_adjustment(double f)
   hz_to_knots = HZ_TO_KNOTS * f;
 }
 
-void WindSpeed::set_apparent_wind_angle(double deg)
-{
-  apparent_wind_angle = deg;
-}
-
-// the time is in micros!
+// the time is in micros! called from an ISR every 1ms
 void WindSpeed::loop_micros(unsigned long t)
 {
   if (last_state_change_time==0) last_state_change_time = t;
@@ -60,14 +61,18 @@ void WindSpeed::loop_micros(unsigned long t)
   int new_state = digitalRead(SPEED_PIN);
   if (new_state!=state)
   {
-    last_period = t - last_state_change_time;
-    last_state_change_time = t;
+    if (state) 
+    {
+      period = t - last_state_change_time;
+      last_state_change_time = t;
+
+    }
     counter++;
     state = new_state;
   }
   else if ((t-last_state_change_time) > 1000000L) // 1 second of no change
   {
-    last_period = 0;
+    period = 0;
     last_state_change_time = t;
   }
 }
