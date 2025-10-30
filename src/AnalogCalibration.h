@@ -1,7 +1,6 @@
-#ifndef _WIND_CALIBRATION_DUMMY_H
-#define _WIND_CALIBRAITON_DUMMY_H
-#include <math.h>
-#include <stdint.h>
+#ifndef _ANALOG_CALIBRATION_H
+#define _ANALOG_CALIBRATION_H
+
 #include "WindUtil.h"
 
 

@@ -59,6 +59,14 @@ void WindDirection::loop(unsigned long milliseconds)
     w_calc.set_reading(wd.i_sin, wd.i_cos);
     wd.ellipse = w_calc.get_ellipse();
     wd.angle = w_calc.get_angle();
+
+    double a = wd.angle;
+    double b = wd.smooth_angle;
+    double diff = a - b;
+    if (diff > 180.0) diff -= 360.0;
+    double a1 = b + diff * wd.angle_smoothing_factor;
+    wd.smooth_angle = norm_deg(a1);
+
     wd.error = w_calc.get_error();
     last_read_time = milliseconds;
 }

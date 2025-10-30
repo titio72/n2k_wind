@@ -28,24 +28,17 @@ void WindSpeed::loop(unsigned long milliseconds)
 {
   unsigned long dt = milliseconds - last_read_time;
   last_read_time = milliseconds;
-  //if (counter==0 || period<2000) 
-  //{
-  //  data.speed = 0.0;
-  //  data.frequency = 0.0;
-  //  data.error = WIND_ERROR_OK;
-  //}
-  //else
+
+  if (dt>50) // arbitrary 50ms interval between two readings (it should be 250ms)
   {
-    double alpha = 0.5/*data.speed_smoothing_factor*/;
-    //smooth_period = (double)period; // * alpha + smooth_period * (1.0 - alpha);
-    //data.frequency = (smooth_period>0) ? (1000000.0 / smooth_period) * 2.0 : 0.0;
+    double alpha = data.speed_smoothing_factor;
     smooth_counter = (double)counter * alpha + smooth_counter * (1.0 - alpha);
-    //data.frequency = (smooth_counter>0) ? (smooth_counter * 1000.0 / (double)dt) * 2.0 : 0.0;
-    data.frequency = (smooth_counter * 4.0);
+    data.frequency = (dt>50) ? (smooth_counter * 1000.0 / (double)dt)  : 0.0;
     data.speed = data.frequency * hz_to_knots;
     data.error_speed = WIND_ERROR_OK;
     counter = 0;
   }
+
 }
 
 void WindSpeed::set_speed_adjustment(double f)

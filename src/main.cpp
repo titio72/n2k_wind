@@ -22,19 +22,14 @@
 #include "LedDriver.h"
 #include "WindUtil.h"
 #include "Conf.h"
+#include "AutoCalibration.h"
+#include "ManualCalibration.h"
 
 #define MAX_BLE_DATA_BUFFER_SIZE 128
 #define N2K_ENABLED false
 
-// 12 bit ADC for ESP32
-#define MAX_ADC_VALUE 4095
-#define MAX_ADC_RANGE 4096
-#define RANGE_DEFAULT_MIN 1024
-#define RANGE_DEFAULT_MAX 3072
-#define RANGE_DEFAULT_VALID 512
-
 // microsecond
-#define MAIN_LOOP_PERIOD_LOW_FREQ 250000L // regulates the loop used to send data on BT and N2K
+#define MAIN_LOOP_PERIOD_LOW_FREQ 200000L // regulates the loop used to send data on BT and N2K
 
 #define BLE_DEVICE_UUID "32890585-c6ee-498b-9e7a-044baefb6542"
 #define BLE_COMMAND_UUID "c3fe2075-ac6c-40bf-8073-73a110453725"
@@ -43,20 +38,23 @@
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src);
 void on_command(int handle, const char* value);
+void on_calibration_complete(Range &s_range, Range &c_range);
 
 #pragma region Global objects
 wind_data wdata;
 Conf conf(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX, RANGE_DEFAULT_VALID);
 N2K &n2k = *N2K::get_instance(NULL, on_n2k_source);
-SinCosDecoder sincos_decoder;
+Range sin_range;
+Range cos_range;
+SinCosDecoder sincos_decoder(sin_range, cos_range);
 WindDirection wind_direction(sincos_decoder, wdata);
 WindSpeed wind_speed(wdata);
-AnalogCalibration calibration_sin(MAX_ADC_RANGE);
-AnalogCalibration calibration_cos(MAX_ADC_RANGE);
-Wind360 w360;
+
+AutoCalibration auto_calibration(on_calibration_complete);
+ManualCalibration manual_calibration(on_calibration_complete);
+
 LedDriver led;
 BTInterface bt(BLE_DEVICE_UUID, "Wind");
-bool calibrating = false;
 
 hw_timer_t *timer = NULL;
 
@@ -83,7 +81,6 @@ void on_n2k_source(unsigned char old_src, unsigned char new_src)
 }
 
 #pragma region BLE command handlers
-
 class ABWindBLEWriteCallback : public ABBLEWriteCallback
 {
   void on_write(int handle, const char* value)
@@ -94,56 +91,56 @@ class ABWindBLEWriteCallback : public ABBLEWriteCallback
 
 void command_set_speed_adj(const char *command_value)
 {
-  Log::trace("[CAL] Setting speed adjustment {%s}\n", command_value);
+  Log::trace("[CMD] Setting speed adjustment {%s}\n", command_value);
   if (command_value[0])
   {
     int32_t adj = 0;
     if (atoi_x(adj, command_value))
     {
       uint32_t uiAdj = adj & 0xFF; // trim to 0..255
-      Log::trace("[CAL] New speed adjustment {%d}\n", uiAdj);
+      Log::trace("[CMD] New speed adjustment {%d}\n", uiAdj);
       conf.speed_adjustment = uiAdj;
       wind_speed.set_speed_adjustment(adj / 100.0);
       conf.write();
     }
     else
     {
-      Log::trace("[CAL] Invalid speed adjustment\n");
+      Log::trace("[CMD] Invalid speed adjustment\n");
     }
   }
   else
   {
-    Log::trace("[CAL] Invalid speed adjustment\n");
+    Log::trace("[CMD] Invalid speed adjustment\n");
   }
 }
 
 void command_set_offset(const char *command_value)
 {
-  Log::trace("[CAL] Setting offset {%s}\n", command_value);
+  Log::trace("[CMD] Setting offset {%s}\n", command_value);
   if (command_value[0])
   {
     int32_t offset = 0;
     if (atoi_x(offset, command_value))
     {
-      Log::trace("[CAL] New offset {%d}\n", offset);
+      Log::trace("[CMD] New offset {%d}\n", offset);
       conf.offset = offset;
       conf.write();
       sincos_decoder.set_offset(offset);
     }
     else
     {
-      Log::trace("[CAL] Invalid offset\n");
+      Log::trace("[CMD] Invalid offset\n");
     }
   }
   else
   {
-    Log::trace("[CAL] Invalid offset\n");
+    Log::trace("[CMD] Invalid offset\n");
   }
 }
 
 void command_set_calibration(const char *command_value)
 {
-  Log::trace("[CAL] Setting manual calibration {%s}\n", command_value);
+  Log::trace("[CMD] Setting manual calibration {%s}\n", command_value);
   int i_tok = 0;
   int32_t vv[] = {-1, -1, -1, -1};
   bool do_write = false;
@@ -158,76 +155,98 @@ void command_set_calibration(const char *command_value)
     }
     i_tok++;
   }
-  Log::trace("[CAL] Read manual cal values {%d %d %d %d}\n", vv[0], vv[1], vv[2], vv[3]);
+  Log::trace("[CMD] Read manual cal values {%d %d %d %d}\n", vv[0], vv[1], vv[2], vv[3]);
   if (vv[0] >= 0 && vv[1] >= 0 && vv[2] >= 0 && vv[3] >= 0)
   {
     Range s_range((uint16_t)vv[0], (uint16_t)vv[1], RANGE_DEFAULT_VALID);
     Range c_range((uint16_t)vv[2], (uint16_t)vv[3], RANGE_DEFAULT_VALID);
     if (c_range.valid() && s_range.valid())
     {
-      conf.sin_range.set(s_range);
-      conf.cos_range.set(c_range);
-      sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+      conf.sin_range = s_range;
+      conf.cos_range = c_range;
+      sin_range = s_range;
+      cos_range = c_range;
       conf.write();
     }
     else
     {
-      Log::trace("[CAL] Manual calibration invalid\n");
+      Log::trace("[CMD] Manual calibration invalid\n");
     }
   }
 }
 
 void command_finalize_calibration()
 {
-  // finalize calibration
-  if (w360.is_valid())
-  {
-    Log::trace("[CAL] Complete calibration\n");
-    calibrating = false;
-    bool cal_sin_ok = calibration_sin.calibrate();
-    bool cal_cos_ok = calibration_cos.calibrate();
-    if (cal_sin_ok && cal_cos_ok)
-    {
-      conf.sin_range.set(calibration_sin.get_calibrated());
-      conf.cos_range.set(calibration_cos.get_calibrated());
-      sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
-      conf.write();
-    }
-    else
-    {
-      Log::trace("[CAL] Invalid ranges to complete calibration\n");
-    }
-  }
-  else
-  {
-    Log::trace("[CAL] Not enough data to complete calibration\n");
-    calibrating = false;
-  }
+  Log::trace("[CMD] finalize calibration\n");
+  manual_calibration.finalize();
 }
 
 void command_factory_reset()
 {
-  Log::trace("[CAL] Reset calibration to default\n");
+  Log::trace("[CMD] Reset calibration to default\n");
   conf.sin_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);
   conf.cos_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);
   conf.offset = 0;
-  sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+  sin_range = conf.sin_range;
+  cos_range = conf.cos_range;
   conf.write();
 }
 
 void command_abort_calibration()
 {
-  Log::trace("[CAL] Abort calibration\n");
-  calibrating = false;
+  Log::trace("[CMD] Abort calibration\n");
+  manual_calibration.abort();
 }
 
 void command_start_calibration()
 {
-  Log::trace("[CAL] Entering calibration\n");
-  calibrating = true;
-  calibration_sin.reset();
-  calibration_cos.reset();
-  w360.reset();
+  Log::trace("[CMD] Starting calibration\n");
+  manual_calibration.start();
+  auto_calibration.disable();
+}
+
+void command_set_speed_smoothing(const char *command_value)
+{
+  Log::trace("[CAL] Setting speed smoothing {%s}\n", command_value);
+  if (command_value[0])
+  {
+    int32_t smoothing = 0;
+    if (atoi_x(smoothing, command_value))
+    {
+      uint32_t uSmoothing = smoothing & 0xFF; // trim to 0..255
+      double alpha = (double)uSmoothing / 50.0; // map to 0..50
+      Log::trace("[CAL] New speed smoothing {%d} alpha {%.2f}\n", uSmoothing, alpha);
+      conf.speed_smoothing = uSmoothing;
+      conf.write();
+      wdata.speed_smoothing_factor = alpha;
+    }
+    else
+    {    
+      Log::trace("[CAL] Invalid speed smoothing\n");
+    }
+  }
+}
+
+void command_set_angle_smoothing(const char *command_value)
+{
+  Log::trace("[CAL] Setting angle smoothing {%s}\n", command_value);
+  if (command_value[0])
+  {
+    int32_t smoothing = 0;
+    if (atoi_x(smoothing, command_value))
+    {
+      uint32_t uSmoothing = smoothing & 0xFF; // trim to 0..255
+      double alpha = (double)uSmoothing / 50.0; // the actual range is 0..50
+      Log::trace("[CAL] New angle smoothing {%d} alpha {%.2f}\n", uSmoothing, alpha);
+      conf.angle_smoothing = uSmoothing;
+      conf.write();
+      wdata.angle_smoothing_factor = alpha;
+    }
+    else
+    {    
+      Log::trace("[CAL] Invalid angle smoothing\n");
+    }
+  }
 }
 
 void on_command(int handle, const char *value)
@@ -260,8 +279,25 @@ void on_command(int handle, const char *value)
       command_factory_reset();
       break;
     case 'H': // Heartbeat
-      // just to know that BT is alive
       last_BT_is_alive = millis();
+      break;
+    case 'W':
+      command_set_speed_smoothing(command_value);
+      break;
+    case 'Q':
+      command_set_angle_smoothing(command_value);
+      break;
+    case 'P': // Start auto calibration
+      Log::trace("[CAL] Toggle auto calibration {%s}\n", auto_calibration.is_enabled() ? "OFF" : "ON");
+      if (auto_calibration.is_enabled())
+      {
+        auto_calibration.disable(); 
+      }
+      else
+      {
+        auto_calibration.enable();
+        manual_calibration.abort();
+      }
       break;
     default:
       Log::trace("[CAL] Unrecognized command {%s}\n", value);
@@ -292,9 +328,12 @@ void setup()
   
   // read configuration from eeprom
   conf.read();
-  sincos_decoder.load_calibration(conf.sin_range, conf.cos_range);
+  sin_range = conf.sin_range;
+  cos_range = conf.cos_range;
   sincos_decoder.set_offset(conf.offset);
   wind_speed.set_speed_adjustment(conf.speed_adjustment / 100.0);
+  wdata.angle_smoothing_factor = (double)conf.angle_smoothing / 50.0; if (wdata.angle_smoothing_factor>1.0) wdata.angle_smoothing_factor=1.0;
+  wdata.speed_smoothing_factor = (double)conf.speed_smoothing / 50.0; if (wdata.speed_smoothing_factor>1.0) wdata.speed_smoothing_factor=1.0;  
 
   // initialize bluetooth
   ble_command_handle = bt.add_setting("command", BLE_COMMAND_UUID);
@@ -320,69 +359,73 @@ void setup()
   Log::trace("[APP] Setup done\n");
 }
 
-void send_BLE(const wind_data &wd, Wind360 &w360, unsigned long time)
+void appendW360(Wind360 &w, uint8_t *data, int &offset)
+{
+    addChar(data, offset, w.size());
+    for (int i = 0; i < w.buffer_size(); i++)
+    {
+      addChar(data, offset, w.get_data(i));
+    }
+}
+
+void send_BLE(unsigned long time)
 {
   static uint8_t data[MAX_BLE_DATA_BUFFER_SIZE];
   uint32_t mem = get_free_mem();
-  uint16_t i_angle = ((int16_t)(wd.angle * 10) + 3600) % 3600;
-  uint16_t i_ellipse = (int)(wd.ellipse * 1000);
-  uint16_t i_speed = isnan(wd.speed) ? 0 : (uint16_t)(wd.speed * 10 + 0.5);
+  uint16_t i_angle = ((int16_t)(wdata.angle * 10) + 3600) % 3600;  
+  uint16_t i_smooth_angle = ((int16_t)(wdata.smooth_angle * 10) + 3600) % 3600;
+  uint16_t i_ellipse = (int)(wdata.ellipse * 1000);
+  uint16_t i_speed = isnan(wdata.speed) ? 0 : (uint16_t)(wdata.speed * 10 + 0.5);
   int offset = 0;
   addShort(data, offset, i_angle);
+  addShort(data, offset, i_smooth_angle);
   addShort(data, offset, i_ellipse);
   addInt(data, offset, mem);
-  addInt(data, offset, wd.error);
-  addShort(data, offset, wd.i_sin);
+  addInt(data, offset, wdata.error);
+  addShort(data, offset, wdata.i_sin);
   addShort(data, offset, conf.sin_range.low());
   addShort(data, offset, conf.sin_range.high());
-  addShort(data, offset, wd.i_cos);
+  addShort(data, offset, wdata.i_cos);
   addShort(data, offset, conf.cos_range.low());
   addShort(data, offset, conf.cos_range.high());
   addShort(data, offset, i_speed);
-  addInt(data, offset, wd.error_speed);
+  addInt(data, offset, wdata.error_speed);
   addInt(data, offset, conf.offset);
   addShort(data, offset, conf.speed_adjustment);
   addChar(data, offset, conf.n2k_source); // new
   addChar(data, offset, conf.angle_smoothing); // new
   addChar(data, offset, conf.speed_smoothing); // new
+  addChar(data, offset, auto_calibration.is_enabled() ? 1 : 0); // new
 
-  if (calibrating)
-  {
-    addChar(data, offset, w360.size());
-    for (int i = 0; i < w360.buffer_size(); i++)
-    {
-      addChar(data, offset, w360.get_data(i));
-    }
-  }
-  else
-  {
-    addChar(data, offset, 0); // no calibration data
-  }
+  if (manual_calibration.is_in_progress()) appendW360(manual_calibration.get_wind360(), data, offset);
+  else if (auto_calibration.is_enabled()) appendW360(auto_calibration.get_wind360(), data, offset);
+  else addChar(data, offset, 0); // no calibration data
+
   bt.set_field_value(ble_wind_data_handle, data, offset); // hope offset<MAX_BLE_DATA_BUFFER_SIZE
 }
 
-void send_N2K(const wind_data &wd, unsigned long time)
+void send_N2K(unsigned long time)
 {
   if (N2K_ENABLED)
   {
-    if (wd.error == WIND_ERROR_OK)
+    if (wdata.error == WIND_ERROR_OK)
     {
       tN2kMsg msg(n2k.get_source());
-      SetN2kWindSpeed(msg, 0, KnotsToms(wd.speed), DegToRad(wd.angle), tN2kWindReference::N2kWind_Apparent);
+      SetN2kWindSpeed(msg, 0, KnotsToms(wdata.speed), DegToRad(wdata.smooth_angle), tN2kWindReference::N2kWind_Apparent);
       n2k.send_msg(msg);
     }
   }
 }
 
-void update_led(const wind_data &wd, unsigned long t)
+void update_led(unsigned long t)
 {
   if (t<last_BT_is_alive + 3000L)
     led.set_blue(true);
   else
     led.set_blue(false);
 
-  led.set_error(wd.error);
-  led.set_calibration(calibrating);
+  led.set_error(wdata.error);
+  led.set_calibration(manual_calibration.is_in_progress());
 }
 
 void do_log()
@@ -392,8 +435,9 @@ void do_log()
                wdata.angle, wdata.ellipse, wdata.error,
                wdata.speed, wdata.frequency, wdata.error_speed);
 
-    if (calibrating)
+    if (manual_calibration.is_in_progress())
     {
+      Wind360 &w360 = manual_calibration.get_wind360();
       Log::trace("{%02d/%02d/%02d} {", w360.progress(), w360.size(), w360.buffer_size());
       for (int i = 0; i < w360.buffer_size(); i++)
         Log::trace(" %02x", w360.get_data(i));
@@ -402,17 +446,22 @@ void do_log()
     Log::trace("                \r\n");
 }
 
+void on_calibration_complete(Range &s_range, Range &c_range)
+{
+    sin_range = s_range;
+    cos_range = c_range;
+    conf.sin_range = s_range;
+    conf.cos_range = c_range;
+    conf.write();
+    Log::trace("[CAL] Calibration updated : sin {%d %d} cos {%d %d}\n",
+               conf.sin_range.low(), conf.sin_range.high(),
+               conf.cos_range.low(), conf.cos_range.high());
+}
+
 void loop()
 {
   unsigned long t = micros();
-
-#if SIMUL == true
-  wind_speed.loop_micros(t);
-  wind_direction.loop_micros(t);
-#endif
-
   static unsigned long t0 = t;
-
   if (check_elapsed(t, t0, MAIN_LOOP_PERIOD_LOW_FREQ))
   {
     unsigned long t_ms = t / 1000L;
@@ -420,28 +469,25 @@ void loop()
     wdata.offset = conf.offset;
 
     // read wind
-    wind_direction.loop(t);
-    wind_speed.loop(t);
+    wind_direction.loop(t_ms);
+    wind_speed.loop(t_ms);
 
-    if (calibrating)
-    {
-      calibration_sin.add_sample(wdata.i_sin);
-      calibration_cos.add_sample(wdata.i_cos);
-      w360.set_degree(wdata.angle);
-    }
-
-    do_log();
+    // manage calibration
+    auto_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
+    manual_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
 
     // update led
-    update_led(wdata, t_ms);
+    update_led(t_ms);
     led.loop(t_ms);
 
     // send data to bluetooth
-    send_BLE(wdata, w360, t_ms);
+    send_BLE(t_ms);
     bt.loop(t_ms);
 
     // send data to n2k
-    send_N2K(wdata, t_ms);
+    send_N2K(t_ms);
     n2k.loop(t_ms);
+
+    do_log();
   }
 }

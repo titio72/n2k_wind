@@ -10,8 +10,8 @@
 #define MIN_ANALOG_VALUE 0
 
 #pragma region WIND
-SinCosDecoder::SinCosDecoder():
-    sin_calibration(MIN_ANALOG_VALUE, MAX_ANALOG_VALUE, 0), cos_calibration(MIN_ANALOG_VALUE, MAX_ANALOG_VALUE, 0),
+SinCosDecoder::SinCosDecoder(Range &s_range, Range &c_range) :
+    sin_calibration(s_range), cos_calibration(c_range),
     angle(NAN), error(WIND_ERROR_OK), offset(0.0)
 {}
 
@@ -31,22 +31,6 @@ int SinCosDecoder::get_error()
 double SinCosDecoder::get_ellipse()
 {
     return ellipse;
-}
-
-Range SinCosDecoder::get_cos_calibration()
-{
-    return cos_calibration;
-}
-
-Range SinCosDecoder::get_sin_calibration()
-{
-    return sin_calibration;
-}
-
-void SinCosDecoder::load_calibration(const Range &s_range, const Range &c_range)
-{
-    sin_calibration.set(s_range);
-    cos_calibration.set(c_range);
 }
 
 void SinCosDecoder::set_offset(double o)

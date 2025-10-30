@@ -1,5 +1,5 @@
-#ifndef _WIND_CALIBRATION_H
-#define _WIND_CALIBRAITON_H
+#ifndef _WIND_360_H
+#define _WIND_360_H
 #include <math.h>
 #include <stdint.h>
 #include "WindUtil.h"
@@ -18,12 +18,13 @@ public:
 
     int16_t progress() { return tot; }
 
-    static int16_t size();
-    static int16_t buffer_size();
+    int16_t size();
+    int16_t buffer_size();
 
     unsigned char get_data(int ix);
     unsigned char* get_data() { return data; }
 private:
+    uint16_t bf_size;
     unsigned char* data;
     int16_t tot;
 };

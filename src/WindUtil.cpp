@@ -79,9 +79,9 @@ double norm_deg(double d)
 int16_t norm_deg(int16_t d)
 {
     if (d < 0)
-        return d + 360;
+        return (d % 360) + 360;
     else
-        return d;
+        return d % 360;
 }
 
 double get_angle_deg(uint16_t sin_reading, Range &sin_calibration, int16_t cos_reading, Range &cos_calibration)

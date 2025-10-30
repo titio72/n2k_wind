@@ -15,7 +15,8 @@ public:
         offset(0),
         speed_smoothing(0), // 0..255 0==no smoothing - 255 = max smoothing. Not used yet
         speed_adjustment(0.672f * 100), // factor to convert Hz to knots, multiplied by 100 to have 2 decimals
-        n2k_source(23)
+        n2k_source(32), // default source address
+        auto_cal(0) // auto calibration disabled by default
   {
   }
 
@@ -27,6 +28,7 @@ public:
   uint8_t angle_smoothing;
   uint8_t speed_adjustment;
   uint8_t n2k_source;
+  uint8_t auto_cal;
 
   bool write();
   bool read();

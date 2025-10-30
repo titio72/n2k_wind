@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "WindUtil.h"
 #include "Wind360.h"
+#include <Log.h>
 
 #pragma region WIND360
 // set  precision of 4 degrees (that is, we are happy to have a sample every 4 degrees)
@@ -31,11 +32,13 @@ void Wind360::reset()
 
 void Wind360::set_degree(double v)
 {
-    v = v<0?v+360:v;
-    int16_t d = (int16_t)(v / (360 / WIND360_SIZE) + 0.5); d = d % WIND360_SIZE;
+    v = norm_deg(v);
+    int16_t d = (int16_t)(v / (360 / WIND360_SIZE) + 0.5); 
+    d = d % WIND360_SIZE;
     int ix = d / 8;
     int p = d % 8;
     unsigned char up = 1 << p;
+    //Log::trace("Set degree %.1f -> %d (ix=%d p=%d up=%02x)\n", v, d, ix, p, up);
     if ((data[ix] & up)==0)
     {
         data[ix] = data[ix] | up;

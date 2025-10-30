@@ -7,7 +7,7 @@
 class SinCosDecoder
 {
 public:
-SinCosDecoder();
+SinCosDecoder(Range &s_range, Range &c_range);
 ~SinCosDecoder();
 
 void set_reading(uint16_t sin, uint16_t cos);
@@ -16,11 +16,7 @@ double get_angle();
 int get_error();
 double get_ellipse();
 
-void load_calibration(const Range &sin_range, const Range &cos_range);
 void set_offset(double degree);
-
-Range get_sin_calibration();
-Range get_cos_calibration();
 
 void sim_values(uint16_t &s, uint16_t &c, unsigned long now_micros, double &expected);
 
@@ -31,8 +27,8 @@ private:
     double sim_deg;
     unsigned long sim_t0;
 
-    Range sin_calibration;
-    Range cos_calibration;
+    Range &sin_calibration;
+    Range &cos_calibration;
     double angle;
     double offset;
     double ellipse;

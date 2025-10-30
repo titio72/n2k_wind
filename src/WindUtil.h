@@ -2,6 +2,14 @@
 #define _WIND_UTIL_H
 #include <stdint.h>
 
+
+// 12 bit ADC for ESP32
+#define MAX_ADC_VALUE 4095
+#define MAX_ADC_RANGE 4096
+#define RANGE_DEFAULT_MIN 1024
+#define RANGE_DEFAULT_MAX 3072
+#define RANGE_DEFAULT_VALID 512
+
 #define WIND_ERROR_NO_CAL_OR_SIGNAL 1
 #define WIND_ERROR_OK 0
 
@@ -14,6 +22,7 @@ struct wind_data
 {
     // angle data
     double angle = 0.0;
+    double smooth_angle = 0.0;
     double ellipse = 1.0;
     int error = WIND_ERROR_NO_CAL_OR_SIGNAL;
     uint16_t i_sin = 0;
@@ -43,6 +52,12 @@ public:
 
     void set(uint16_t low, uint16_t high);
     void set(const Range &range) { set(range.l, range.h); }
+
+    Range &operator=(const Range &range)
+    {
+        set(range);
+        return *this;
+    }
 
 private:
     uint16_t l;

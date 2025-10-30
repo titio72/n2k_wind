@@ -2,6 +2,7 @@
 #include <Log.h>
 #include <EEPROM.h>
 #include "Conf.h"
+#include <Preferences.h>
 
 bool Conf::write()
 {
