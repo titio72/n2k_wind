@@ -359,25 +359,37 @@ void setup()
   Log::trace("[APP] Setup done\n");
 }
 
-void appendW360(Wind360 &w, uint8_t *data, int &offset)
+void appendW360(Wind360 &w, ByteBuffer &buffer)
 {
-    addChar(data, offset, w.size());
+    buffer << (uint8_t)w.size();
     for (int i = 0; i < w.buffer_size(); i++)
     {
-      addChar(data, offset, w.get_data(i));
+      buffer << (uint8_t)w.get_data(i);
     }
 }
 
 void send_BLE(unsigned long time)
 {
-  static uint8_t data[MAX_BLE_DATA_BUFFER_SIZE];
+  //static uint8_t data[MAX_BLE_DATA_BUFFER_SIZE];
   uint32_t mem = get_free_mem();
   uint16_t i_angle = ((int16_t)(wdata.angle * 10) + 3600) % 3600;  
   uint16_t i_smooth_angle = ((int16_t)(wdata.smooth_angle * 10) + 3600) % 3600;
   uint16_t i_ellipse = (int)(wdata.ellipse * 1000);
   uint16_t i_speed = isnan(wdata.speed) ? 0 : (uint16_t)(wdata.speed * 10 + 0.5);
-  int offset = 0;
-  addShort(data, offset, i_angle);
+
+  static ByteBuffer buffer(MAX_BLE_DATA_BUFFER_SIZE);
+  buffer << i_angle << i_smooth_angle << i_ellipse 
+         << mem << wdata.error
+         << wdata.i_sin << conf.sin_range.low() << conf.sin_range.high()
+         << wdata.i_cos << conf.cos_range.low() << conf.cos_range.high()
+         << i_speed << wdata.error_speed 
+         << (int32_t)conf.offset
+         << (uint16_t)conf.speed_adjustment 
+         << conf.n2k_source
+         << conf.angle_smoothing << conf.speed_smoothing
+         << (uint8_t)(auto_calibration.is_enabled() ? 1 : 0);
+
+  /*addShort(data, offset, i_angle);
   addShort(data, offset, i_smooth_angle);
   addShort(data, offset, i_ellipse);
   addInt(data, offset, mem);
@@ -392,16 +404,25 @@ void send_BLE(unsigned long time)
   addInt(data, offset, wdata.error_speed);
   addInt(data, offset, conf.offset);
   addShort(data, offset, conf.speed_adjustment);
-  addChar(data, offset, conf.n2k_source); // new
-  addChar(data, offset, conf.angle_smoothing); // new
-  addChar(data, offset, conf.speed_smoothing); // new
-  addChar(data, offset, auto_calibration.is_enabled() ? 1 : 0); // new
+  addChar(data, offset, conf.n2k_source);
+  addChar(data, offset, conf.angle_smoothing);
+  addChar(data, offset, conf.speed_smoothing);
+  addChar(data, offset, auto_calibration.is_enabled() ? 1 : 0);*/
 
-  if (manual_calibration.is_in_progress()) appendW360(manual_calibration.get_wind360(), data, offset);
-  else if (auto_calibration.is_enabled()) appendW360(auto_calibration.get_wind360(), data, offset);
-  else addChar(data, offset, 0); // no calibration data
+  if (manual_calibration.is_in_progress()) appendW360(manual_calibration.get_wind360(), buffer);
+  else if (auto_calibration.is_enabled()) appendW360(auto_calibration.get_wind360(), buffer);
+  else buffer << (uint8_t)0; // no calibration data
 
-  bt.set_field_value(ble_wind_data_handle, data, offset); // hope offset<MAX_BLE_DATA_BUFFER_SIZE
+  if (buffer.length() > MAX_BLE_DATA_BUFFER_SIZE)
+  {
+    Log::trace("[BLE] Data buffer overflow %d > %d\n", buffer.length(), MAX_BLE_DATA_BUFFER_SIZE);
+  }
+  else
+  {
+    bt.set_field_value(ble_wind_data_handle, buffer.data(), buffer.length());
+  }
+
+  buffer.reset();
 }
 
 void send_N2K(unsigned long time)

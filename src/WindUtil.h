@@ -1,7 +1,8 @@
 #ifndef _WIND_UTIL_H
 #define _WIND_UTIL_H
 #include <stdint.h>
-
+#include <string.h>
+#include <math.h>
 
 // 12 bit ADC for ESP32
 #define MAX_ADC_VALUE 4095
@@ -15,8 +16,6 @@
 
 #define to_radians(angleInDegrees) ((angleInDegrees) * M_PI / 180.0)
 #define to_degrees(angleInRadians) ((angleInRadians) * 180.0 / M_PI)
-#define max(v1, v2) ((v1 < v2) ? v2 : v1)
-#define min(v1, v2) ((v1 < v2) ? v1 : v2)
 
 struct wind_data
 {
@@ -44,10 +43,10 @@ public:
     Range();
     Range(uint16_t low, uint16_t high, uint16_t valid_span);
 
-    uint16_t low();
-    uint16_t high();
-    uint16_t mid();
-    uint16_t size();
+    uint16_t low() { return l; }
+    uint16_t high() { return h; }
+    uint16_t mid() { return (uint16_t)round((l+h)/2); }
+    uint16_t size() { return h - l; }
     bool valid();
 
     void set(uint16_t low, uint16_t high);
@@ -83,10 +82,54 @@ bool atoi_x(int32_t &value, const char *s_value);
 
 bool parse_value(int32_t &target_value, const char *s_value, uint16_t max_value);
 
-void addInt(uint8_t *dest, int &offset, uint32_t data32);
+double lpf_angle(double previous, double current, double alpha);
 
-void addShort(uint8_t *dest, int &offset, uint16_t data16);
+class ByteBuffer
+{
+public:
+    ByteBuffer(size_t size) : buf_size(size), offset(0) {
+        buffer = new uint8_t[size];
+    }
 
-void addChar(uint8_t *dest, int &offset, uint8_t data8);
+    ~ByteBuffer()
+    {
+        delete[] buffer;
+    }
+
+    ByteBuffer &operator<< (const char* t)
+    {
+        size_t t_size = strlen(t);
+        if (offset + t_size <= buf_size) {
+            strcpy((char*)(buffer + offset), t);
+            offset += t_size;
+        }
+        return *this;
+    }
+
+    template<typename T>
+    ByteBuffer &operator<< (T t)
+    {
+        size_t t_size = sizeof(T);
+        if (offset + t_size <= buf_size) {
+            *((T*)(buffer + offset)) = t;
+            offset += t_size;
+        }
+        return *this;
+    }
+
+    void reset()
+    {
+        offset = 0;
+    }
+
+    uint8_t* data() { return buffer; }
+    size_t size() { return buf_size; }
+    size_t length() { return offset; }
+
+private:
+    uint8_t *buffer;
+    size_t buf_size;
+    size_t offset;
+};
 
 #endif

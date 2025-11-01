@@ -54,19 +54,12 @@ double WindDirection::get_expected()
 
 void WindDirection::loop(unsigned long milliseconds)
 {
-    wd.i_cos = (uint16_t)(sumCos / BUFFER_SIZE + 0.5);
-    wd.i_sin = (uint16_t)(sumSin / BUFFER_SIZE + 0.5);
+    wd.i_cos = (uint16_t)round(sumCos / BUFFER_SIZE);
+    wd.i_sin = (uint16_t)round(sumSin / BUFFER_SIZE);
     w_calc.set_reading(wd.i_sin, wd.i_cos);
     wd.ellipse = w_calc.get_ellipse();
     wd.angle = w_calc.get_angle();
-
-    double a = wd.angle;
-    double b = wd.smooth_angle;
-    double diff = a - b;
-    if (diff > 180.0) diff -= 360.0;
-    double a1 = b + diff * wd.angle_smoothing_factor;
-    wd.smooth_angle = norm_deg(a1);
-
+    wd.smooth_angle = lpf_angle(wd.smooth_angle, wd.angle, wd.angle_smoothing_factor);
     wd.error = w_calc.get_error();
     last_read_time = milliseconds;
 }

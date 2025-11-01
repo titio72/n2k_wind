@@ -8,26 +8,6 @@ Range::Range() : l(UINT16_MAX), h(0), valid_span(1) {} // init invalid
 
 Range::Range(uint16_t _low, uint16_t _high, uint16_t _valid_span) : l(_low), h(_high), valid_span(_valid_span) {}
 
-uint16_t Range::low()
-{
-    return l;
-}
-
-uint16_t Range::high()
-{
-    return h;
-}
-
-uint16_t Range::mid()
-{
-    return (int16_t)((h + l) / 2.0 + 0.5);
-}
-
-uint16_t Range::size()
-{
-    return h - l + 1;
-}
-
 bool Range::valid()
 {
     return size() > valid_span;
@@ -140,31 +120,6 @@ bool atoi_x(int32_t &value, const char *s_value)
     }
 }
 
-void addInt(uint8_t *dest, int &offset, uint32_t data32)
-{
-    uint8_t *temp = dest + offset;
-    temp[0] = data32;
-    temp[1] = data32 >> 8;
-    temp[2] = data32 >> 16;
-    temp[3] = data32 >> 24;
-    offset += 4;
-}
-
-void addShort(uint8_t *dest, int &offset, uint16_t data16)
-{
-    uint8_t *temp = dest + offset;
-    temp[0] = data16;
-    temp[1] = data16 >> 8;
-    offset += 2;
-}
-
-void addChar(uint8_t *dest, int &offset, uint8_t data8)
-{
-    uint8_t *temp = dest + offset;
-    temp[0] = data8;
-    offset += 1;
-}
-
 bool parse_value(int32_t &target_value, const char *s_value, uint16_t max_value)
 {
     int32_t value = -1;
@@ -175,6 +130,16 @@ bool parse_value(int32_t &target_value, const char *s_value, uint16_t max_value)
     }
     return false;
 }
+
+double lpf_angle(double previous, double current, double alpha)
+{
+    if (isnan(previous)) return current;
+    if (isnan(current)) return previous;
+    double diff = current - previous;
+    if (diff > 180.0) diff -= 360.0; else if (diff < -180.0) diff += 360.0;
+   return norm_deg(previous + alpha * diff);
+}
+
 
 /*
 int main(int arc, const char** argv) {
