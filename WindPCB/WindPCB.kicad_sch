@@ -5190,14 +5190,13 @@
 				(justify right)
 			)
 		)
-		(property "Value" "R_Potentiometer_Small"
-			(at 120.142 86.614 0)
+		(property "Value" "5K"
+			(at 139.7 78.486 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(justify right)
-				(hide yes)
 			)
 		)
 		(property "Footprint" "Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical"
@@ -5400,7 +5399,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "1000"
+		(property "Value" "2K"
 			(at 139.7 87.6299 0)
 			(effects
 				(font
@@ -6464,7 +6463,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "1000"
+		(property "Value" "2K"
 			(at 148.59 88.8999 0)
 			(effects
 				(font
@@ -7730,14 +7729,13 @@
 				(justify right)
 			)
 		)
-		(property "Value" "R_Potentiometer_Small"
-			(at 129.032 90.424 0)
+		(property "Value" "5K"
+			(at 148.59 82.296 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
 				(justify right)
-				(hide yes)
 			)
 		)
 		(property "Footprint" "Potentiometer_THT:Potentiometer_Bourns_3296W_Vertical"
