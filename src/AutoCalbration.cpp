@@ -46,17 +46,19 @@ void AutoCalibration::record_reading(uint16_t s, uint16_t c, double angle)
         sin_readings[s]++;
         cos_readings[c]++;
 
-        wind360.set_degree(angle);
-    
-        if (wind360.is_valid())
+        if (wind360.set_degree(angle))
         {
-            Log::trace("[AUTOCAL] Auto calibration complete. Extracting ranges...\n");
-            Range range_sin = extract_range(sin_readings, "Sin");
-            Range range_cos = extract_range(cos_readings, "Cos");
-            memset(sin_readings, 0, sizeof(sin_readings));
-            memset(cos_readings, 0, sizeof(cos_readings));
-            wind360.reset();
-            if (on_autocalibration_complete) on_autocalibration_complete(range_sin, range_cos);
+            //if (wind360.is_valid())
+            if (wind360.get_score()>0.90)
+            {
+                Log::trace("[AUTOCAL] Auto calibration complete (score = %.2f). Extracting ranges...\n", wind360.get_score());
+                Range range_sin = extract_range(sin_readings, "Sin");
+                Range range_cos = extract_range(cos_readings, "Cos");
+                memset(sin_readings, 0, sizeof(sin_readings));
+                memset(cos_readings, 0, sizeof(cos_readings));
+                wind360.reset();
+                if (on_autocalibration_complete) on_autocalibration_complete(range_sin, range_cos);
+            }
         }
     }
 }

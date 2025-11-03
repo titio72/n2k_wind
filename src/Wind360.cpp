@@ -11,8 +11,24 @@
 
 int bf_size;
 
+int angle_score(double a)
+{
+    if (a>=270.0) a -= 270.0;
+    else if (a>=180.0) a -= 180.0;
+    else if (a>=90.0) a -= 90.0;
+
+    return (a > 15.0 || a < 75.0) ? 1 : 3;
+}
+
 Wind360::Wind360(): tot(0)
 {
+    sample_size = 360.0 / WIND360_SIZE;
+    score = 0.0;
+    tot_score = 0.0;
+    for (int i = 0; i<size(); i++)
+    {
+        tot_score += angle_score(i * sample_size);
+    }
     bf_size = WIND360_SIZE / 8 + ((WIND360_SIZE % 8)?1:0);
     data = new unsigned char[bf_size];
     reset();
@@ -27,10 +43,11 @@ void Wind360::reset()
 {
     for (int i = 0; i<bf_size; i++) data[i] = 0;
     for (int i = WIND360_SIZE; i<(bf_size * 8); i++) data[bf_size - 1] = data[bf_size - 1] | (1 << (i%8));
+    score = 0.0;
     tot = 0;
 }
 
-void Wind360::set_degree(double v)
+bool Wind360::set_degree(double v)
 {
     v = norm_deg(v);
     int16_t d = (int16_t)(v / (360 / WIND360_SIZE) + 0.5); 
@@ -43,6 +60,12 @@ void Wind360::set_degree(double v)
     {
         data[ix] = data[ix] | up;
         tot++;
+        score += angle_score(v);
+        return true;
+    }
+    else
+    {
+        return false;
     }
 }
 

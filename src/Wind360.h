@@ -10,7 +10,10 @@ public:
     Wind360();
     ~Wind360();
 
-    void set_degree(double d);
+    /**
+     * return false if the angle was already set, otherwise true
+     */
+    bool set_degree(double d);
 
     bool is_valid();
 
@@ -23,9 +26,15 @@ public:
 
     unsigned char get_data(int ix);
     unsigned char* get_data() { return data; }
+
+    double get_score() { return score / tot_score; }
+
 private:
     uint16_t bf_size;
     unsigned char* data;
     int16_t tot;
+    double sample_size;
+    double tot_score;
+    double score;
 };
 #endif

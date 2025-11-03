@@ -29,7 +29,7 @@
 #define N2K_ENABLED false
 
 // microsecond
-#define MAIN_LOOP_PERIOD_LOW_FREQ 200000L // regulates the loop used to send data on BT and N2K
+#define MAIN_LOOP_PERIOD_LOW_FREQ 250000L // regulates the loop used to send data on BT and N2K
 
 #define BLE_DEVICE_UUID "32890585-c6ee-498b-9e7a-044baefb6542"
 #define BLE_COMMAND_UUID "c3fe2075-ac6c-40bf-8073-73a110453725"
@@ -249,6 +249,20 @@ void command_set_angle_smoothing(const char *command_value)
   }
 }
 
+void command_toggle_autocalib()
+{
+    Log::trace("[CAL] Toggle auto calibration {%s}\n", auto_calibration.is_enabled() ? "OFF" : "ON");
+    if (auto_calibration.is_enabled())
+    {
+      auto_calibration.disable(); 
+    }
+    else
+    {
+      auto_calibration.enable();
+      manual_calibration.abort();
+    }
+}
+
 void on_command(int handle, const char *value)
 {
   if (handle == ble_command_handle && value && value[0])
@@ -281,23 +295,14 @@ void on_command(int handle, const char *value)
     case 'H': // Heartbeat
       last_BT_is_alive = millis();
       break;
-    case 'W':
+    case 'W': // change LPF alpha for the speed smoothing
       command_set_speed_smoothing(command_value);
       break;
-    case 'Q':
+    case 'Q': // change LPF alpha for the direction smoothing
       command_set_angle_smoothing(command_value);
       break;
     case 'P': // Start auto calibration
-      Log::trace("[CAL] Toggle auto calibration {%s}\n", auto_calibration.is_enabled() ? "OFF" : "ON");
-      if (auto_calibration.is_enabled())
-      {
-        auto_calibration.disable(); 
-      }
-      else
-      {
-        auto_calibration.enable();
-        manual_calibration.abort();
-      }
+      command_toggle_autocalib();
       break;
     default:
       Log::trace("[CAL] Unrecognized command {%s}\n", value);
@@ -333,7 +338,9 @@ void setup()
   sincos_decoder.set_offset(conf.offset);
   wind_speed.set_speed_adjustment(conf.speed_adjustment / 100.0);
   wdata.angle_smoothing_factor = (double)conf.angle_smoothing / 50.0; if (wdata.angle_smoothing_factor>1.0) wdata.angle_smoothing_factor=1.0;
-  wdata.speed_smoothing_factor = (double)conf.speed_smoothing / 50.0; if (wdata.speed_smoothing_factor>1.0) wdata.speed_smoothing_factor=1.0;  
+  wdata.speed_smoothing_factor = (double)conf.speed_smoothing / 50.0; if (wdata.speed_smoothing_factor>1.0) wdata.speed_smoothing_factor=1.0;
+
+  if (conf.auto_cal) auto_calibration.enable();
 
   // initialize bluetooth
   ble_command_handle = bt.add_setting("command", BLE_COMMAND_UUID);
@@ -366,6 +373,7 @@ void appendW360(Wind360 &w, ByteBuffer &buffer)
     {
       buffer << (uint8_t)w.get_data(i);
     }
+    buffer << (uint8_t)round(w.get_score() * 100.0);
 }
 
 void send_BLE(unsigned long time)
@@ -388,26 +396,6 @@ void send_BLE(unsigned long time)
          << conf.n2k_source
          << conf.angle_smoothing << conf.speed_smoothing
          << (uint8_t)(auto_calibration.is_enabled() ? 1 : 0);
-
-  /*addShort(data, offset, i_angle);
-  addShort(data, offset, i_smooth_angle);
-  addShort(data, offset, i_ellipse);
-  addInt(data, offset, mem);
-  addInt(data, offset, wdata.error);
-  addShort(data, offset, wdata.i_sin);
-  addShort(data, offset, conf.sin_range.low());
-  addShort(data, offset, conf.sin_range.high());
-  addShort(data, offset, wdata.i_cos);
-  addShort(data, offset, conf.cos_range.low());
-  addShort(data, offset, conf.cos_range.high());
-  addShort(data, offset, i_speed);
-  addInt(data, offset, wdata.error_speed);
-  addInt(data, offset, conf.offset);
-  addShort(data, offset, conf.speed_adjustment);
-  addChar(data, offset, conf.n2k_source);
-  addChar(data, offset, conf.angle_smoothing);
-  addChar(data, offset, conf.speed_smoothing);
-  addChar(data, offset, auto_calibration.is_enabled() ? 1 : 0);*/
 
   if (manual_calibration.is_in_progress()) appendW360(manual_calibration.get_wind360(), buffer);
   else if (auto_calibration.is_enabled()) appendW360(auto_calibration.get_wind360(), buffer);
@@ -451,18 +439,21 @@ void update_led(unsigned long t)
 
 void do_log()
 {
-    Log::trace("[APP] Wind Sin/Cos {%d[%d..%d]/%d[%d..%d]} Dir {%5.1f} Ellipse {%.1f} ErrCode {%d} Speed {%.1f} Freq {%.1f} ErrCodeSpeed {%d}",
+    Log::trace("[APP] Wind Sin/Cos {%d[%d..%d]/%d[%d..%d]} Dir {%5.1f} Ellipse {%.1f} ErrCode {%d} Speed {%.1f} Freq {%.1f} ErrCodeSpeed {%d} Auto {%d}",
                wdata.i_sin, conf.sin_range.low(), conf.cos_range.high(), wdata.i_cos, conf.cos_range.low(), conf.cos_range.high(),
                wdata.angle, wdata.ellipse, wdata.error,
-               wdata.speed, wdata.frequency, wdata.error_speed);
+               wdata.speed, wdata.frequency, wdata.error_speed,
+              auto_calibration.is_enabled());
 
-    if (manual_calibration.is_in_progress())
+    Wind360 *w = (manual_calibration.is_in_progress()?&manual_calibration.get_wind360():(auto_calibration.is_enabled()?&auto_calibration.get_wind360():nullptr));
+
+    if (w)
     {
-      Wind360 &w360 = manual_calibration.get_wind360();
-      Log::trace("{%02d/%02d/%02d} {", w360.progress(), w360.size(), w360.buffer_size());
+      Wind360 &w360 = *w;
+      Log::trace(" {%02d/%02d/%02d} {", w360.progress(), w360.size(), w360.buffer_size());
       for (int i = 0; i < w360.buffer_size(); i++)
         Log::trace(" %02x", w360.get_data(i));
-      Log::trace("}");
+      Log::trace(" - %.2f}", w360.get_score());
     }
     Log::trace("                \r\n");
 }

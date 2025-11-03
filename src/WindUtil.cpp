@@ -140,7 +140,6 @@ double lpf_angle(double previous, double current, double alpha)
    return norm_deg(previous + alpha * diff);
 }
 
-
 /*
 int main(int arc, const char** argv) {
     const char* _c = "123|234|345|456";
