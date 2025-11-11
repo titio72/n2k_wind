@@ -34,9 +34,6 @@ void ManualCalibration::abort()
 
 void ManualCalibration::finalize()
 {
-  // finalize calibration
-  if (w360.is_valid())
-  {
     Log::trace("[CAL] Complete calibration\n");
     in_progress = false;
     bool cal_sin_ok = sin_calibration.calibrate();
@@ -54,10 +51,4 @@ void ManualCalibration::finalize()
     {
       Log::trace("[CAL] Invalid ranges to complete calibration\n");
     }
-  }
-  else
-  {
-    Log::trace("[CAL] Not enough data to complete calibration\n");
-    in_progress = false;
-  }
 }   

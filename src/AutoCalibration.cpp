@@ -1,7 +1,7 @@
 #include "AutoCalibration.h"
 #include <Log.h>
 
-AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range)) : enabled(false)
+AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range)) : enabled(false), score_valid_threshold(0.8)
 {
     on_autocalibration_complete = on_complete;
     memset(sin_readings, 0, sizeof(sin_readings));
@@ -10,14 +10,19 @@ AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_ra
 
 AutoCalibration::~AutoCalibration()
 {
+    reset();
+}
+
+void AutoCalibration::reset()
+{
+    memset(sin_readings, 0, sizeof(sin_readings));
+    memset(cos_readings, 0, sizeof(cos_readings));
+    wind360.reset();
 }
 
 boolean AutoCalibration::is_valid_reading(uint16_t reading, Range &range)
 {
     return reading > 500 && reading < 3500;
-        // && 
-        //reading > (range.low() - max_valid_difference) && 
-        //reading < (range.high() + max_valid_difference); // arbitrary limits to avoid garbage
 }
 
 Range extract_range(uint16_t *readings, const char* label = "")
@@ -48,8 +53,7 @@ void AutoCalibration::record_reading(uint16_t s, uint16_t c, double angle)
 
         if (wind360.set_degree(angle))
         {
-            //if (wind360.is_valid())
-            if (wind360.get_score()>0.90)
+            if (wind360.get_score()>=score_valid_threshold)
             {
                 Log::trace("[AUTOCAL] Auto calibration complete (score = %.2f). Extracting ranges...\n", wind360.get_score());
                 Range range_sin = extract_range(sin_readings, "Sin");

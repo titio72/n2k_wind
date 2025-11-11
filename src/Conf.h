@@ -16,8 +16,25 @@ public:
         speed_smoothing(0), // 0..255 0==no smoothing - 255 = max smoothing. Not used yet
         speed_adjustment(0.672f * 100), // factor to convert Hz to knots, multiplied by 100 to have 2 decimals
         n2k_source(32), // default source address
-        auto_cal(0) // auto calibration disabled by default
+        auto_cal(0), // auto calibration disabled by default
+        calibration_score_threshold(80), // a calibration is valid to be committed when the score is higher than...
+        usb_tracing(1)
   {
+  }
+
+  double get_angle_smoothing_factor()
+  {
+    return (double)angle_smoothing / 50.0;
+  }
+
+  double get_speed_smoothing_factor()
+  {
+    return (double)speed_smoothing / 50.0;
+  }
+
+  double get_calibration_threshold_factor()
+  {
+    return (double)calibration_score_threshold / 100.0;
   }
 
   char serial;
@@ -29,6 +46,8 @@ public:
   uint8_t speed_adjustment;
   uint8_t n2k_source;
   uint8_t auto_cal;
+  uint8_t calibration_score_threshold;
+  uint8_t usb_tracing;
 
   bool write();
   bool read();

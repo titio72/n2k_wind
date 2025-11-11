@@ -5,7 +5,7 @@
 
 #define BUFFER_SIZE 400 // about 0.4s averaging at 1ms rate 
 
-WindDirection::WindDirection(SinCosDecoder &w, wind_data &d) : w_calc(w), wd(d), expected(0.0), ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
+WindDirection::WindDirection(SinCosDecoder &w) : w_calc(w), expected(0.0), ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
 {
     sinBuffer = new uint16_t[BUFFER_SIZE];
     cosBuffer = new uint16_t[BUFFER_SIZE];
@@ -29,10 +29,8 @@ void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s)
 
 void WindDirection::loop_micros(unsigned long now_micros) // this is called from an ISR every 1ms
 {
-    uint16_t i_sin = 0;
-    uint16_t i_cos = 0;
-    i_sin = analogRead(SIN_PIN);
-    i_cos = analogRead(COS_PIN);
+    uint16_t i_sin = analogRead(SIN_PIN);
+    uint16_t i_cos = analogRead(COS_PIN);
     expected = NAN;
     buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
     buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
@@ -52,7 +50,7 @@ double WindDirection::get_expected()
     return expected;
 }
 
-void WindDirection::loop(unsigned long milliseconds)
+void WindDirection::read_data(wind_data &wd, unsigned long milliseconds)
 {
     wd.i_cos = (uint16_t)round(sumCos / BUFFER_SIZE);
     wd.i_sin = (uint16_t)round(sumSin / BUFFER_SIZE);

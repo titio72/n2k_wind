@@ -119,7 +119,7 @@ void N2K::add_pgn(unsigned long pgn)
     n_pgns++;
 }
 
-void N2K::setup()
+void N2K::setup(n2k_device_info dvc)
 {
     if (!is_initialized())
     {
@@ -131,17 +131,8 @@ void N2K::setup()
         NMEA2000 = new tNMEA2000_SocketCAN(socket_name);
         #endif
 
-        NMEA2000->SetProductInformation("00000001",                         // Manufacturer's Model serial code
-                                       100,                                // Manufacturer's product code
-                                       "ABN2k                           ", // Manufacturer's Model ID
-                                       "1.0.3.0 (2024-01-07)",             // Manufacturer's Software version code
-                                       "1.0.2.0 (2019-07-07)"              // Manufacturer's Model version
-        );
-        NMEA2000->SetDeviceInformation(1,   // Unique number. Use e.g. Serial number.
-                                      145, // Device function=Analog to NMEA 2000 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                      60,  // Device class=Inter/Intranetwork Device. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
-                                      2046 // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
-        );
+        NMEA2000->SetProductInformation(dvc.ModelSerialCode.c_str(), dvc.ProductCode, dvc.ModelID.c_str(), dvc.SwCode.c_str(), dvc.ModelVersion.c_str());
+        NMEA2000->SetDeviceInformation(dvc.UniqueNumber, dvc.DeviceFunction, dvc.DeviceClass, dvc.ManufacturerCode);
         if (_handler)
         {
             NMEA2000->SetMode(tNMEA2000::N2km_ListenAndNode, desired_source);

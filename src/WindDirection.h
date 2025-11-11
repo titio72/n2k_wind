@@ -7,14 +7,14 @@
 class WindDirection
 {
 public:
-    WindDirection(SinCosDecoder &wcalc, wind_data &data);
+    WindDirection(SinCosDecoder &wcalc);
     ~WindDirection();
 
     double get_expected();
 
     void setup();
 
-    void loop(unsigned long milliseconds);
+    void read_data(wind_data& wd, unsigned long milliseconds);
 
     void loop_micros(unsigned long now_micros);
 
@@ -22,7 +22,6 @@ public:
 
 private:
     SinCosDecoder &w_calc;
-    wind_data &wd;
     double expected;
     uint16_t *sinBuffer, *cosBuffer;
     uint16_t ix_buffer_sin, ix_buffer_cos;

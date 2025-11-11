@@ -17,6 +17,20 @@ public:
     void reset();
 };
 
+struct n2k_device_info
+{
+    std::string ModelSerialCode = "0.0.1";
+    unsigned short ProductCode = 100;
+    std::string ModelID = "AB";
+    std::string SwCode = "AB 0.0.1";
+    std::string ModelVersion = "0001";
+
+    unsigned long UniqueNumber = 1;     // Unique number. Use e.g. Serial number.
+    unsigned char DeviceFunction = 145; // Device function=Analog to NMEA 2000 Gateway. See codes on http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+    unsigned char DeviceClass = 60;     // Device class=Inter/Intranetwork Device. See codes on  http://www.nmea.org/Assets/20120726%20nmea%202000%20class%20&%20function%20codes%20v%202.00.pdf
+    uint16_t ManufacturerCode = 2046;   // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
+};
+
 class N2K {
 
     public:
@@ -24,7 +38,7 @@ class N2K {
 
         virtual ~N2K();
 
-        void setup();
+        void setup(n2k_device_info dvc);
 
         void loop(unsigned long time);
 
@@ -51,6 +65,8 @@ class N2K {
         unsigned char desired_source;
         unsigned long* pgns;
         int n_pgns;
+        n2k_device_info device_info;
+
 };
 
 #endif

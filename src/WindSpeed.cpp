@@ -16,7 +16,7 @@ Raymarine sats that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #define HZ_TO_KNOTS 0.672f // use 0.672f for ST50
 //#define HZ_TO_KNOTS 1.000f // use 1.000f for ST60
 
-WindSpeed::WindSpeed(wind_data &d) : hz_to_knots(HZ_TO_KNOTS), data(d)
+WindSpeed::WindSpeed() : hz_to_knots(HZ_TO_KNOTS)
 {
 }
 
@@ -24,7 +24,7 @@ WindSpeed::~WindSpeed()
 {
 }
 
-void WindSpeed::loop(unsigned long milliseconds)
+void WindSpeed::read_data(wind_data &data, unsigned long milliseconds)
 {
   unsigned long dt = milliseconds - last_read_time;
   last_read_time = milliseconds;

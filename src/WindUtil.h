@@ -17,6 +17,8 @@
 #define to_radians(angleInDegrees) ((angleInDegrees) * M_PI / 180.0)
 #define to_degrees(angleInRadians) ((angleInRadians) * 180.0 / M_PI)
 
+class Wind360;
+
 struct wind_data
 {
     // angle data
@@ -35,6 +37,7 @@ struct wind_data
 
     double angle_smoothing_factor = 1.0;
     double speed_smoothing_factor = 1.0;
+    double calibration_score_threshold = 0.8;
 };
 
 class Range
@@ -50,7 +53,7 @@ public:
     bool valid();
 
     void set(uint16_t low, uint16_t high);
-    void set(const Range &range) { set(range.l, range.h); }
+    void set(const Range &range);
 
     Range &operator=(const Range &range)
     {
@@ -87,24 +90,10 @@ double lpf_angle(double previous, double current, double alpha);
 class ByteBuffer
 {
 public:
-    ByteBuffer(size_t size) : buf_size(size), offset(0) {
-        buffer = new uint8_t[size];
-    }
+    ByteBuffer(size_t size);
+    ~ByteBuffer();
 
-    ~ByteBuffer()
-    {
-        delete[] buffer;
-    }
-
-    ByteBuffer &operator<< (const char* t)
-    {
-        size_t t_size = strlen(t);
-        if (offset + t_size <= buf_size) {
-            strcpy((char*)(buffer + offset), t);
-            offset += t_size;
-        }
-        return *this;
-    }
+    ByteBuffer &operator<< (const char* t);
 
     template<typename T>
     ByteBuffer &operator<< (T t)
@@ -116,11 +105,10 @@ public:
         }
         return *this;
     }
+    
+    ByteBuffer &operator<< (Wind360 &w);
 
-    void reset()
-    {
-        offset = 0;
-    }
+    void reset();
 
     uint8_t* data() { return buffer; }
     size_t size() { return buf_size; }

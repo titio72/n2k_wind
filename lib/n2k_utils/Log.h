@@ -21,6 +21,9 @@ public:
 	static void tracex(const char* module, const char* action);
 
 	static void setdebug();
+
+	static void enable();
+	static void disable();
 };
 
 

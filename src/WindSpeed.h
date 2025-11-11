@@ -8,14 +8,14 @@ struct wind_data;
 class WindSpeed
 {
 public:
-    WindSpeed(wind_data &wind_data);
+    WindSpeed();
     ~WindSpeed();
 
     unsigned long get_sample_age() { return last_read_time; }
 
     void setup();
 
-    void loop(unsigned long milliseconds);
+    void read_data(wind_data &data, unsigned long milliseconds);
 
     void loop_micros(unsigned long now_micros);
 
@@ -32,8 +32,6 @@ private:
     unsigned long period = 0;
     double smooth_period = 0.0;
     double smooth_counter = 0.0;
-    
-    wind_data &data;
 };
 
 #endif

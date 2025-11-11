@@ -193,7 +193,7 @@ void BTInterface::begin()
     pServer->getAdvertising()->start();
 }
 
-void BTInterface::loop(unsigned long ms)
+void BTInterface::loop(unsigned long milli_seconds)
 {
 }
 

@@ -14,6 +14,8 @@ public:
     void disable() { enabled = false; }
     bool is_enabled() { return enabled; }
 
+    void reset();
+
     void record_reading(uint16_t sin_reading, uint16_t cos_reading, double angle);
 
     uint16_t get_max_validity_difference() { return max_valid_difference; }
@@ -23,6 +25,9 @@ public:
     void set_min_valid_samples_count(uint16_t c) { min_valid_samples_count = c; }
 
     Wind360& get_wind360() { return wind360; }
+
+    double get_score_valid_threshold() { return score_valid_threshold; }
+    void set_score_valid_threshold(double t) { score_valid_threshold = t; }
 
 private:
     bool enabled;
@@ -39,6 +44,8 @@ private:
     boolean is_valid_reading(uint16_t reading, Range &range);
 
     void (*on_autocalibration_complete)(Range &s_range, Range &c_range);
+
+    double score_valid_threshold;
 };
 
 #endif// AutoCalibration.h

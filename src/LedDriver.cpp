@@ -16,6 +16,7 @@ void LedDriver::setup()
 
 void set_led_color(int error, bool calibration, int& r, int& g, int& b)
 {
+    #if USE_LED==true
     if (calibration)
     {
         r = LED_INTENSITY / 2; g = LED_INTENSITY / 2; b = LED_INTENSITY / 2;
@@ -35,6 +36,7 @@ void set_led_color(int error, bool calibration, int& r, int& g, int& b)
             break;
         }
     }
+    #endif
 }
 
 void LedDriver::set_calibration(bool c)
@@ -54,7 +56,7 @@ void LedDriver::set_error(int e)
 
 void LedDriver::loop(unsigned long t)
 {
-
+  #if USE_LED==true
   static unsigned long t0 = 0;
   static bool led_on = false;
   if ((t-t0)>=500)
@@ -73,4 +75,5 @@ void LedDriver::loop(unsigned long t)
     }
     led_on = !led_on;
   }
+  #endif
 }

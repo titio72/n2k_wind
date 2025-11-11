@@ -10,8 +10,7 @@
 #define MIN_ANALOG_VALUE 0
 
 #pragma region WIND
-SinCosDecoder::SinCosDecoder(Range &s_range, Range &c_range) :
-    sin_calibration(s_range), cos_calibration(c_range),
+SinCosDecoder::SinCosDecoder() :
     angle(NAN), error(WIND_ERROR_OK), offset(0.0)
 {}
 

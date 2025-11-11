@@ -16,13 +16,14 @@
 #define MAX_TRACE_SIZE 1024
 
 static bool _debug = false;
+static bool enabled = false;
 
 static char outbfr[MAX_TRACE_SIZE];
 
 inline bool can_trace()
 {
 #ifdef ESP32_ARCH
-	return Serial.availableForWrite();
+	return enabled && Serial.availableForWrite();
 #else
 	return true;
 #endif
@@ -61,6 +62,16 @@ void _trace(const char *text)
 void Log::setdebug()
 {
 	_debug = true;
+}
+
+void Log::enable()
+{
+	enabled = true;
+}
+
+void Log::disable()
+{
+	enabled = false;
 }
 
 void Log::debug(const char *text, ...)

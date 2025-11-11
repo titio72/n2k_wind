@@ -1,16 +1,24 @@
 #include "WindUtil.h"
+#include "Wind360.h"
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
 
 #pragma region Range
-Range::Range() : l(UINT16_MAX), h(0), valid_span(1) {} // init invalid
+Range::Range() : l(RANGE_DEFAULT_MIN), h(RANGE_DEFAULT_MAX), valid_span(RANGE_DEFAULT_VALID) {} // init invalid
 
 Range::Range(uint16_t _low, uint16_t _high, uint16_t _valid_span) : l(_low), h(_high), valid_span(_valid_span) {}
 
 bool Range::valid()
 {
     return size() > valid_span;
+}
+
+void Range::set(const Range& r)
+{
+     l = r.l;
+     h = r.h;
+     valid_span = r.valid_span;
 }
 
 void Range::set(uint16_t low, uint16_t high)
@@ -163,3 +171,35 @@ int main(int arc, const char** argv) {
    return 0;
 }
 */
+
+ByteBuffer::ByteBuffer(size_t size) : buf_size(size), offset(0) {
+    buffer = new uint8_t[size];
+}
+
+ByteBuffer::~ByteBuffer()
+{
+    delete[] buffer;
+}
+
+ByteBuffer& ByteBuffer::operator<< (Wind360 &w)
+{
+    *this << (uint8_t)w.size();
+    for (int i = 0; i < w.buffer_size(); i++) *this << (uint8_t)w.get_data(i);
+    *this << (uint8_t)round(w.get_score() * 100.0);
+    return *this;
+}
+
+ByteBuffer &ByteBuffer::operator<< (const char* t)
+{
+    size_t t_size = strlen(t);
+    if (offset + t_size <= buf_size) {
+        strcpy((char*)(buffer + offset), t);
+        offset += t_size;
+    }
+    return *this;
+}
+
+void ByteBuffer::reset()
+{
+    offset = 0;
+}
