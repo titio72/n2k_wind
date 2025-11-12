@@ -2,6 +2,7 @@
 #include "WindSpeed.h"
 #include "WindUtil.h"
 #include "Utils.h"
+#include "Conf.h"
 
 /*
 The vane are r=55mm from the center, so a full round is 2*pi*r
@@ -12,9 +13,6 @@ The magic number to convert Hz in Knots is 2*(pi*0.055*2600/1852) = 0.672
 
 Raymarine sats that 20Hz (10Hz considering a full revolution) is 20Knots, which would mean a factor of 1.0
 */
-
-#define HZ_TO_KNOTS 0.672f // use 0.672f for ST50
-//#define HZ_TO_KNOTS 1.000f // use 1.000f for ST60
 
 WindSpeed::WindSpeed() : hz_to_knots(HZ_TO_KNOTS)
 {
@@ -44,6 +42,11 @@ void WindSpeed::read_data(wind_data &data, unsigned long milliseconds)
 void WindSpeed::set_speed_adjustment(double f)
 {
   hz_to_knots = HZ_TO_KNOTS * f;
+}
+
+void WindSpeed::apply_configuration(Conf& conf)
+{
+  set_speed_adjustment(conf.get_speed_adjustement());
 }
 
 // the time is in micros! called from an ISR every 1ms

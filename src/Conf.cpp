@@ -32,7 +32,8 @@ bool Conf::read()
     {
       EEPROM.get(0, *this);
       read = true;
-      Log::trace("[CAL] Read calibration: sin {%d %d} cos {%d %d} offset {%d} speed_adj {%d}\n", sin_range.low(), sin_range.high(), cos_range.low(), cos_range.high(), offset, speed_adjustment);
+      Log::trace("[CAL] Read calibration: sin {%d %d} cos {%d %d} offset {%d} speed_adj {%d} angle_smoothing {%d} speed_smoothing {%d}\n", 
+        sin_range.low(), sin_range.high(), cos_range.low(), cos_range.high(), offset, speed_adjustment, angle_smoothing, speed_smoothing);
       // configuration is good
     }
     EEPROM.end();

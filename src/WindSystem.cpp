@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "WindSystem.h"
+#include <Utils.h>
 #include <WiFi.h>
 #include <Log.h>
 
@@ -30,12 +31,11 @@ void WindSystem::enable_usb_tracing(bool enabled)
     if (enabled)
     {
         Log::enable();
-        Serial.begin(115200);
+        
     }
     else
     {
         Log::disable();
-        Serial.end();
     }
 }
 

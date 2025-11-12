@@ -59,7 +59,8 @@ public:
                 << conf.angle_smoothing << conf.speed_smoothing
                 << conf.calibration_score_threshold
                 << conf.auto_cal
-                << calib_progress;
+                << calib_progress
+                << wdata.n2k_err;
 
         if (buffer.length() > MAX_BLE_DATA_BUFFER_SIZE)
         {

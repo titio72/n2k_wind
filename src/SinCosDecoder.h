@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include "WindUtil.h"
 
+class Conf;
+
 class SinCosDecoder
 {
 public:
@@ -22,6 +24,8 @@ void sim_values(uint16_t &s, uint16_t &c, unsigned long now_micros, double &expe
 
 Range &get_sin_calibration() { return sin_calibration; }
 Range &get_cos_calibration() { return cos_calibration; }
+
+void apply_configuration(Conf& conf);
 
 private:
     double get_sim_angle(unsigned long now_micros);

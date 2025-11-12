@@ -9,14 +9,10 @@
 #define N2K_ENABLED true
 #endif
 
-#ifndef DEFAULT_WIND_N2K_SOURCE
-#define DEFAULT_WIND_N2K_SOURCE 26
-#endif
-
 class N2KWind
 {
 public:
-    N2KWind(void (*on_src)(uint8_t old_src, uint8_t new_src)) : n2k(*N2K::get_instance(NULL, on_src)), src(DEFAULT_WIND_N2K_SOURCE)
+    N2KWind(void (*on_src)(uint8_t old_src, uint8_t new_src)) : n2k(*N2K::get_instance(NULL, on_src)), src(DEFAULT_WIND_N2K_SOURCE), no_stats(true)
     {
     }
 
@@ -42,7 +38,7 @@ public:
 
     void send_N2K(wind_data &wdata, unsigned long time)
     {
-        if (N2K_ENABLED && wdata.error == WIND_ERROR_OK)
+        if (N2K_ENABLED) // && wdata.error == WIND_ERROR_OK)
         {
             tN2kMsg msg(n2k.get_source());
             SetN2kWindSpeed(msg, 0, KnotsToms(wdata.speed), DegToRad(wdata.smooth_angle), tN2kWindReference::N2kWind_Apparent);
@@ -55,13 +51,30 @@ public:
         if (N2K_ENABLED)
         {
             n2k.loop(milliseconds);
+
+            N2KStats s = n2k.getStats();
+            if (no_stats)
+            {
+                last_stats = s;
+            }
+            else
+            {
+                n2k_err = (s.fail>last_stats.fail);
+            }
         }
     }
 
+    bool is_n2k_err()
+    {
+        return n2k_err;
+    }
 
 private:
     N2K &n2k;
     uint8_t src;
+    N2KStats last_stats;
+    bool no_stats;
+    bool n2k_err;
 };
 
 #endif

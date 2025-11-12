@@ -3,16 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
-
-// 12 bit ADC for ESP32
-#define MAX_ADC_VALUE 4095
-#define MAX_ADC_RANGE 4096
-#define RANGE_DEFAULT_MIN 1024
-#define RANGE_DEFAULT_MAX 3072
-#define RANGE_DEFAULT_VALID 512
-
-#define WIND_ERROR_NO_CAL_OR_SIGNAL 1
-#define WIND_ERROR_OK 0
+#include "Constants.h"
 
 #define to_radians(angleInDegrees) ((angleInDegrees) * M_PI / 180.0)
 #define to_degrees(angleInRadians) ((angleInRadians) * 180.0 / M_PI)
@@ -38,6 +29,8 @@ struct wind_data
     double angle_smoothing_factor = 1.0;
     double speed_smoothing_factor = 1.0;
     double calibration_score_threshold = 0.8;
+
+    uint8_t n2k_err = 1;
 };
 
 class Range

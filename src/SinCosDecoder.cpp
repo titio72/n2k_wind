@@ -3,6 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include "SinCosDecoder.h"
+#include "Conf.h"
 
 #define SIN_COS_VALIDITY_THRESHOLD 0.2
 
@@ -46,7 +47,12 @@ void SinCosDecoder::set_reading(uint16_t sin_reading, uint16_t cos_reading)
     error = (abs(1.0 - ellipse)<SIN_COS_VALIDITY_THRESHOLD)?WIND_ERROR_OK:WIND_ERROR_NO_CAL_OR_SIGNAL;
 }
 
-
+void SinCosDecoder::apply_configuration(Conf& conf)
+{
+    set_offset(conf.offset);
+    sin_calibration.set(conf.sin_range);
+    cos_calibration.set(conf.cos_range);
+}
 #pragma endregion
 
 #ifndef ESP32_ARCH

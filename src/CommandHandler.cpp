@@ -8,17 +8,6 @@
 #include "ManualCalibration.h"
 #include "AutoCalibration.h"
 
-// Constants
-constexpr uint8_t MIN_SPEED_ADJ = 0;
-constexpr uint8_t MAX_SPEED_ADJ = 255;
-constexpr int32_t MIN_OFFSET = -3600;
-constexpr int32_t MAX_OFFSET = 3600;
-constexpr uint8_t MIN_SMOOTHING = 0;
-constexpr uint8_t MAX_SMOOTHING = 50;
-constexpr uint8_t MIN_THRESHOLD = 60;
-constexpr uint8_t MAX_THRESHOLD = 100;
-constexpr size_t MAX_COMMAND_LENGTH = 256;
-
 void apply_calibration(const Range &sin, const Range& cos, Conf &conf)
 {
     conf.cos_range.set(cos);
@@ -199,7 +188,7 @@ CommandResult CommandHandler::command_start_calibration()
 {
     Log::trace("[CMD] Starting calibration\n");
     manual_calibration.start();
-    auto_calibration.disable();
+    auto_calibration.enable(false);
     return CommandResult::SUCCESS;
 }
 
@@ -287,13 +276,13 @@ CommandResult CommandHandler::command_toggle_autocalib()
     if (auto_calibration.is_enabled())
     {
         conf.auto_cal = 0;
-        auto_calibration.disable();
+        auto_calibration.enable(false);
     }
     else
     {
         conf.auto_cal = 1;
         auto_calibration.reset();
-        auto_calibration.enable();
+        auto_calibration.enable(true);
         manual_calibration.abort();
     }
     return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
@@ -304,16 +293,14 @@ CommandResult CommandHandler::command_toggle_debug()
     Log::trace("[CAL] Toggle debug info on USB {%s}\n", conf.usb_tracing ? "OFF" : "ON");
     conf.usb_tracing = !conf.usb_tracing;
     if (conf.usb_tracing)
-        Log::enable();
-    else
-        Log::disable();
-    if (conf.usb_tracing)
     {
-        Serial.begin(115200);
+        //Serial.begin(115200);
+        Log::enable();
     }
     else
     {
-        Serial.end();
+        Log::disable();
+        //Serial.end();
     }
     return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }

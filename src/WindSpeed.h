@@ -1,9 +1,8 @@
 #ifndef _WIND_SPEED_H
 #define _WIND_SPEED_H
 
-#define SMOOTHING_BUFFER_SIZE 32
-
 struct wind_data;
+class Conf;
 
 class WindSpeed
 {
@@ -20,6 +19,8 @@ public:
     void loop_micros(unsigned long now_micros);
 
     void set_speed_adjustment(double f);
+
+    void apply_configuration(Conf& conf);
 
 private:
     unsigned long last_read_time = 0;

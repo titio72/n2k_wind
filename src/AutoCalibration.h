@@ -4,14 +4,15 @@
 #include "WindUtil.h"
 #include "Wind360.h"
 
+class Conf;
+
 class AutoCalibration
 {
 public:
     AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range) = nullptr);
     ~AutoCalibration();
 
-    void enable() { enabled = true; }
-    void disable() { enabled = false; }
+    void enable(bool e) { enabled = e; }
     bool is_enabled() { return enabled; }
 
     void reset();
@@ -29,6 +30,7 @@ public:
     double get_score_valid_threshold() { return score_valid_threshold; }
     void set_score_valid_threshold(double t) { score_valid_threshold = t; }
 
+    void apply_configuration(Conf &conf);
 private:
     bool enabled;
     Range range_sin;

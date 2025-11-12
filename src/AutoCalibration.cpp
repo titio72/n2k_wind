@@ -1,4 +1,5 @@
 #include "AutoCalibration.h"
+#include "Conf.h"
 #include <Log.h>
 
 AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range)) : enabled(false), score_valid_threshold(0.8)
@@ -65,4 +66,10 @@ void AutoCalibration::record_reading(uint16_t s, uint16_t c, double angle)
             }
         }
     }
+}
+
+void AutoCalibration::apply_configuration(Conf &conf)
+{
+    set_score_valid_threshold(conf.get_calibration_threshold_factor());
+    enable(conf.auto_cal==1);
 }
