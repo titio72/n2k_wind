@@ -130,6 +130,7 @@ void loop()
   static wind_data wdata;
   unsigned long t = micros();
   static unsigned long t0 = t;
+  static unsigned long n2k_t0 = t;
   if (check_elapsed(t, t0, MAIN_LOOP_PERIOD_LOW_FREQ))
   {
     unsigned long t_ms = t / 1000L;
@@ -160,7 +161,7 @@ void loop()
     ble_wind.loop(t_ms);
 
     // send data to n2k
-    n2k_wind.send_N2K(wdata, t_ms);
+    if (check_elapsed(t, n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(wdata, t_ms);
     n2k_wind.loop(t_ms);
 
     wdata.n2k_err = n2k_wind.is_n2k_err()?1:0;

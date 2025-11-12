@@ -33,6 +33,7 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #endif
 
 // microsecond
-#define MAIN_LOOP_PERIOD_LOW_FREQ 250000L // regulates the loop used to send data on BT and N2K
+#define MAIN_LOOP_PERIOD_LOW_FREQ 250000L // regulates the main loop used to read sensors and interacts with N2K & BLE
+#define WIND_N2K_DATA_FREQ 500000L // regulates how frequently send out wind info on the N2K bus
 
 #endif

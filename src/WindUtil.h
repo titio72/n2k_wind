@@ -60,6 +60,15 @@ private:
     uint16_t valid_span;
 };
 
+inline const char* get_vane_type()
+{
+    #if VANE_TYPE==ST50
+    return "ST50";
+    #else
+    return "ST60";
+    #endif
+}
+
 double to_analog(uint16_t reading, double v_low, double v_high, Range Range);
 
 uint16_t to_digital(double value, double v_low, double v_high, Range range);

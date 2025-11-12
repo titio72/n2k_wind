@@ -60,7 +60,9 @@ public:
                 << conf.calibration_score_threshold
                 << conf.auto_cal
                 << calib_progress
-                << wdata.n2k_err;
+                << wdata.n2k_err
+                << get_vane_type();
+
 
         if (buffer.length() > MAX_BLE_DATA_BUFFER_SIZE)
         {
