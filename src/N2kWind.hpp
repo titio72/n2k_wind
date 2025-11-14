@@ -36,12 +36,12 @@ public:
         }
     }
 
-    void send_N2K(wind_data &wdata, unsigned long time)
+    void send_N2K(double awd_deg, double aws_kn, unsigned long time)
     {
         if (N2K_ENABLED) // && wdata.error == WIND_ERROR_OK)
         {
             tN2kMsg msg(n2k.get_source());
-            SetN2kWindSpeed(msg, 0, KnotsToms(wdata.speed), DegToRad(wdata.smooth_angle), tN2kWindReference::N2kWind_Apparent);
+            SetN2kWindSpeed(msg, 0, KnotsToms(aws_kn), DegToRad(awd_deg), tN2kWindReference::N2kWind_Apparent);
             n2k.send_msg(msg);
         }
     }

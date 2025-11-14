@@ -133,6 +133,7 @@ void loop()
   static unsigned long n2k_t0 = t;
   if (check_elapsed(t, t0, MAIN_LOOP_PERIOD_LOW_FREQ))
   {
+    wdata.heap = get_free_mem();
     unsigned long t_ms = t / 1000L;
 
     // reload configuration
@@ -149,8 +150,11 @@ void loop()
     wind_speed.read_data(wdata, t_ms);
 
     // manage calibration
-    auto_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
-    manual_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
+    if (t_ms>CALIBRATION_SAMPLING_EXCLUSION_PERIOD) // do not sample for X seconds after restart
+    {
+      auto_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
+      manual_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
+    }
 
     // update led
     update_led(wdata);
@@ -161,7 +165,7 @@ void loop()
     ble_wind.loop(t_ms);
 
     // send data to n2k
-    if (check_elapsed(t, n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(wdata, t_ms);
+    if (check_elapsed(t, n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(wdata.smooth_angle, wdata.speed, t_ms);
     n2k_wind.loop(t_ms);
 
     wdata.n2k_err = n2k_wind.is_n2k_err()?1:0;

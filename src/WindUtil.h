@@ -31,6 +31,10 @@ struct wind_data
     double calibration_score_threshold = 0.8;
 
     uint8_t n2k_err = 1;
+
+    unsigned long heap = 0;
+
+    void apply_configuration() {}
 };
 
 class Range

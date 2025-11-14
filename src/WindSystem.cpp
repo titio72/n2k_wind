@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include "WindSystem.h"
+#include "Constants.h"
 #include <Utils.h>
 #include <WiFi.h>
 #include <Log.h>
@@ -41,11 +42,7 @@ void WindSystem::enable_usb_tracing(bool enabled)
 
 void WindSystem::setup()
 {
-    // initialize CPU frequency
-    uint32_t f = getCpuFrequencyMhz();
-    bool res_cpu_freq = setCpuFrequencyMhz(80);
-    uint32_t f1 = getCpuFrequencyMhz();
-    WiFi.mode(WIFI_OFF);
+    setCpuFrequencyMhz(CPU_FREQUENCY);
 
     // initialize hw timer for wind measurement
     timer = timerBegin(1, 80, true);              // Timer 0, clock divider 80

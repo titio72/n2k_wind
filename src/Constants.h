@@ -35,5 +35,16 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 // microsecond
 #define MAIN_LOOP_PERIOD_LOW_FREQ 250000L // regulates the main loop used to read sensors and interacts with N2K & BLE
 #define WIND_N2K_DATA_FREQ 500000L // regulates how frequently send out wind info on the N2K bus
+#define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 30000L // milliseconds - do not take samples for 30 seconds after restart (sample would be funny)
+#define CPU_FREQUENCY 80
 
+#define BLE_DEVICE_UUID "32890585-c6ee-498b-9e7a-044baefb6542"
+#define BLE_COMMAND_UUID "c3fe2075-ac6c-40bf-8073-73a110453725"
+#define BLE_CONF_UUID "c04a9b9c-3ab6-4cce-9b59-1b582112e693"
+#define BLE_WIND_DATA_UUID "003d0cab-70f7-43ac-8ab9-db26466572af"
+
+#define BLE_DEVICE_NAME "Wind"
+#define BLE_COMMAND_CHARACTERISTIC_NAME "command"
+#define BLE_DATA_CHARACTERISTIC_NAME "data"
+#define BLE_CONF_CHARACTERISTIC_NAME "conf"
 #endif

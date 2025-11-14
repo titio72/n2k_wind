@@ -192,8 +192,9 @@ ByteBuffer& ByteBuffer::operator<< (Wind360 &w)
 ByteBuffer &ByteBuffer::operator<< (const char* t)
 {
     size_t t_size = strlen(t);
-    if (offset + t_size <= buf_size) {
-        strcpy((char*)(buffer + offset), t);
+    if (t_size<255 && offset + t_size <= buf_size) {
+        *this << (uint8_t)t_size;
+        memcpy(buffer + offset, t, t_size);
         offset += t_size;
     }
     return *this;
