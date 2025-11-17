@@ -10,44 +10,16 @@
 
 class Wind360;
 
-struct wind_data
-{
-    // angle data
-    double angle = 0.0;
-    double smooth_angle = 0.0;
-    double ellipse = 1.0;
-    int error = WIND_ERROR_NO_CAL_OR_SIGNAL;
-    uint16_t i_sin = 0;
-    uint16_t i_cos = 0;
-    uint16_t offset = 0;
-
-    // speed data
-    double speed = 0.0;
-    double frequency = 0.0;
-    int error_speed = WIND_ERROR_NO_CAL_OR_SIGNAL;
-
-    double angle_smoothing_factor = 1.0;
-    double speed_smoothing_factor = 1.0;
-    double calibration_score_threshold = 0.8;
-
-    uint8_t n2k_err = 1;
-
-    unsigned long heap = 0;
-
-    void apply_configuration() {}
-};
-
 class Range
 {
 public:
     Range();
-    Range(uint16_t low, uint16_t high, uint16_t valid_span);
+    Range(uint16_t low, uint16_t high, uint16_t valid_span = RANGE_DEFAULT_VALID);
 
     uint16_t low() { return l; }
     uint16_t high() { return h; }
-    uint16_t mid() { return (uint16_t)round((l+h)/2); }
-    uint16_t size() { return h - l; }
-    bool valid();
+    uint16_t range() { return (h > l) ? (h - l) : 0; }
+    bool is_valid();
 
     void set(uint16_t low, uint16_t high);
     void set(const Range &range);
@@ -58,38 +30,27 @@ public:
         return *this;
     }
 
+    void expand(uint16_t new_value);
+
+    double to_analog(double min, double max, uint16_t value);
+
 private:
     uint16_t l;
     uint16_t h;
-    uint16_t valid_span;
+    uint16_t minimum_valid_span;
 };
 
-inline const char* get_vane_type()
-{
-    #if VANE_TYPE==ST50
-    return "ST50";
-    #else
-    return "ST60";
-    #endif
-}
-
 double to_analog(uint16_t reading, double v_low, double v_high, Range Range);
-
-uint16_t to_digital(double value, double v_low, double v_high, Range range);
 
 double norm_deg(double d);
 
 int16_t norm_deg(int16_t d);
 
-double get_angle_deg(int16_t sin_reading, Range &sin_calibration, int16_t cos_reading, Range &cos_calibration);
-
-int16_t get_noise(int16_t amplitude);
-
 char *mystrtok(char **m, char *s, char c);
 
 bool atoi_x(int32_t &value, const char *s_value);
 
-bool parse_value(int32_t &target_value, const char *s_value, uint16_t max_value);
+bool parse_value(int32_t &target_value, const char *s_value, int32_t max_value);
 
 double lpf_angle(double previous, double current, double alpha);
 

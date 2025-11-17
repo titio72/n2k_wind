@@ -18,8 +18,6 @@ double get_angle();
 int get_error();
 double get_ellipse();
 
-void set_offset(double degree);
-
 void sim_values(uint16_t &s, uint16_t &c, unsigned long now_micros, double &expected);
 
 Range &get_sin_calibration() { return sin_calibration; }
@@ -37,7 +35,6 @@ private:
     Range sin_calibration;
     Range cos_calibration;
     double angle;
-    double offset;
     double ellipse;
     int error;
 };

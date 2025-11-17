@@ -4,34 +4,27 @@
 
 #include "SinCosDecoder.h"
 #include "Wind360.h"
-#include "AnalogCalibration.h"
 #include "WindSpeed.h"
 #include "WindDirection.h"
 #include "LedDriver.h"
 #include "WindUtil.h"
-#include "Conf.h"
+#include "DataAndConf.h"
 #include "AutoCalibration.h"
-#include "ManualCalibration.h"
 #include "CommandHandler.h"
 #include "BLEWind.hpp"
 #include "N2kWind.hpp"
 #include "WindSystem.h"
-
-
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src);
 void on_calibration_complete(Range &s_range, Range &c_range);
 
 #pragma region Global objects
 Conf conf;
-SinCosDecoder sincos_decoder;
-WindDirection wind_direction(sincos_decoder);
+WindDirection wind_direction;
 WindSpeed wind_speed;
 AutoCalibration auto_calibration(on_calibration_complete);
-ManualCalibration manual_calibration(on_calibration_complete);
 LedDriver led;
-CommandContext context = {conf, auto_calibration, manual_calibration};
-CommandHandler cmd_handler(context);
+CommandHandler cmd_handler(conf, auto_calibration);
 BLEWind ble_wind(cmd_handler);
 N2KWind n2k_wind(on_n2k_source);
 WindSystem &wind_sys(WindSystem::get_instance());
@@ -80,20 +73,14 @@ void setup()
 
 Wind360 &get_calibration_progress()
 {
-  static Wind360 emptyW60(0);
-  if (manual_calibration.is_in_progress())
-    return manual_calibration.get_wind360();
-  else if (auto_calibration.is_enabled())
-    return auto_calibration.get_wind360();
-  else
-    return emptyW60;
+  return auto_calibration.get_wind360();
 }
 
 void update_led(const wind_data &wdata)
 {
   led.set_blue(ble_wind.is_alive());
   led.set_error(wdata.error);
-  led.set_calibration(manual_calibration.is_in_progress());
+  led.set_calibration(wdata.conf.auto_cal);
 }
 
 void do_log(const wind_data &wdata)
@@ -137,12 +124,9 @@ void loop()
     unsigned long t_ms = t / 1000L;
 
     // reload configuration
-    wdata.speed_smoothing_factor = conf.get_speed_smoothing_factor();
-    wdata.angle_smoothing_factor = conf.get_angle_smoothing_factor();
-    wdata.offset = conf.offset;
-    wdata.calibration_score_threshold = conf.calibration_score_threshold;
-    sincos_decoder.apply_configuration(conf);
+    wdata.conf = conf;
     wind_speed.apply_configuration(conf);
+    wind_direction.apply_configuration(conf);
     auto_calibration.apply_configuration(conf);
 
     // read wind
@@ -153,7 +137,6 @@ void loop()
     if (t_ms>CALIBRATION_SAMPLING_EXCLUSION_PERIOD) // do not sample for X seconds after restart
     {
       auto_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
-      manual_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
     }
 
     // update led
@@ -161,11 +144,14 @@ void loop()
     led.loop(t_ms);
 
     // send data to bluetooth
-    ble_wind.send_BLE(wdata, conf, get_calibration_progress());
+    ble_wind.send_BLE(wdata, auto_calibration);
     ble_wind.loop(t_ms);
 
     // send data to n2k
-    if (check_elapsed(t, n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(wdata.smooth_angle, wdata.speed, t_ms);
+    if (check_elapsed(t, n2k_t0, WIND_N2K_DATA_FREQ))
+    {
+      n2k_wind.send_N2K(wdata.get_out_angle(), wdata.speed);
+    }
     n2k_wind.loop(t_ms);
 
     wdata.n2k_err = n2k_wind.is_n2k_err()?1:0;

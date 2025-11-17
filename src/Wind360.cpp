@@ -1,9 +1,7 @@
-#include <stdio.h>
 #include <math.h>
-#include <stdlib.h>
+#include <cstring>
 #include "WindUtil.h"
 #include "Wind360.h"
-#include <Log.h>
 
 int angle_score(double a)
 {

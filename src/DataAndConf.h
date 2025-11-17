@@ -13,8 +13,8 @@ public:
         sin_range(def_l, def_h, validity), // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
         cos_range(def_l, def_h, validity), // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
         offset(0),
-        speed_smoothing(0), // 0..50 alpha value for LPF - 50 = no smoothing
-        angle_smoothing(0), // 0..50 alpha value for LPF - 50 = no smoothing
+        speed_smoothing(0), // 0..100 alpha value for LPF - 100 = no smoothing
+        angle_smoothing(0), // 0..100 alpha value for LPF - 100 = no smoothing
         speed_adjustment(100), // 0..100 speed adjustment, multiplied by 100 to have 2 decimals
         n2k_source(DEFAULT_WIND_N2K_SOURCE), // default source address
         auto_cal(0), // auto calibration disabled by default
@@ -59,4 +59,46 @@ public:
   bool read();
 };
 
+struct wind_data
+{
+    // angle data
+    double angle = 0.0;
+    double smooth_angle = 0.0;
+    double ellipse = 1.0;
+    int error = WIND_ERROR_NO_CAL_OR_SIGNAL;
+    uint16_t i_sin = 0;
+    uint16_t i_cos = 0;
+
+    // speed data
+    double speed = 0.0;
+    double frequency = 0.0;
+    int error_speed = WIND_ERROR_NO_CAL_OR_SIGNAL;
+
+    // system data
+    uint8_t n2k_err = 1;
+    unsigned long heap = 0;
+    
+    // configuration
+    //uint16_t offset = 0;
+    //double angle_smoothing_factor = 1.0;
+    //double speed_smoothing_factor = 1.0;
+    //double calibration_score_threshold = 0.8;
+
+    Conf conf;
+
+    double get_out_angle()
+    {
+      return norm_deg(smooth_angle + conf.offset);
+    }
+};
+
+
+inline const char* get_vane_type()
+{
+    #if VANE_TYPE==0
+    return "ST50";
+    #else
+    return "ST60";
+    #endif
+}
 #endif

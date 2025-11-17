@@ -36,7 +36,7 @@ public:
         }
     }
 
-    void send_N2K(double awd_deg, double aws_kn, unsigned long time)
+    void send_N2K(double awd_deg, double aws_kn)
     {
         if (N2K_ENABLED) // && wdata.error == WIND_ERROR_OK)
         {

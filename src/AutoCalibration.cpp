@@ -1,70 +1,54 @@
 #include "AutoCalibration.h"
-#include "Conf.h"
+#include "DataAndConf.h"
 #include <Log.h>
 
-AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range)) : enabled(false), score_valid_threshold(0.8)
+AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range)) 
+    : enabled(false), score_valid_threshold(0.8)
 {
     on_autocalibration_complete = on_complete;
-    memset(sin_readings, 0, sizeof(sin_readings));
-    memset(cos_readings, 0, sizeof(cos_readings));
+    reset();
 }
 
 AutoCalibration::~AutoCalibration()
 {
-    reset();
 }
 
 void AutoCalibration::reset()
 {
-    memset(sin_readings, 0, sizeof(sin_readings));
-    memset(cos_readings, 0, sizeof(cos_readings));
+    range_cos.set(MAX_ADC_VALUE, 0); // inverted min and max
+    range_sin.set(MAX_ADC_VALUE, 0); // inverted min and max
     wind360.reset();
 }
 
-boolean AutoCalibration::is_valid_reading(uint16_t reading, Range &range)
+inline bool is_valid_reading(uint16_t reading)
 {
-    return reading > 500 && reading < 3500;
+    return reading <= MAX_ADC_VALUE; // expand in future...
 }
 
-Range extract_range(uint16_t *readings, const char* label = "")
+bool AutoCalibration::is_calibration_in_score()
 {
-    Range range;
-    int candidate_low = -1;
-    int candidate_high = -1;
-    for (int i = 0; i<4096; i++)
-    {
-        if (candidate_low==-1 && readings[i]>0) candidate_low = i;
-        if (candidate_high==-1 && readings[4095 - i]>0) candidate_high = 4095 - i;
-        if (candidate_low!=-1 && candidate_high!=-1)
-        {
-            range.set((uint16_t)candidate_low, (uint16_t)candidate_high);
-            Log::trace("[AUTOCAL] Extracted range %s {%d %d}\n", label, range.low(), range.high());
-            return range;
-        }
-    }
-    return range;
+    return wind360.get_score()>=score_valid_threshold;
+}
+
+bool AutoCalibration::is_calibration_valid()
+{
+    return range_cos.is_valid() && range_sin.is_valid();
 }
 
 void AutoCalibration::record_reading(uint16_t s, uint16_t c, double angle)
 {
-    if (enabled && is_valid_reading(s, range_sin) && is_valid_reading(c, range_cos))
+    if (is_valid_reading(s) && is_valid_reading(c))
     {
-        sin_readings[s]++;
-        cos_readings[c]++;
-
         if (wind360.set_degree(angle))
         {
-            if (wind360.get_score()>=score_valid_threshold)
+            range_cos.expand(c);
+            range_sin.expand(s);
+            if (is_enabled() && is_calibration_in_score())
             {
                 Log::trace("[AUTOCAL] Auto calibration complete (score = %.2f). Extracting ranges...\n", wind360.get_score());
-                Range range_sin = extract_range(sin_readings, "Sin");
-                Range range_cos = extract_range(cos_readings, "Cos");
-                memset(sin_readings, 0, sizeof(sin_readings));
-                memset(cos_readings, 0, sizeof(cos_readings));
-                wind360.reset();
-                if (on_autocalibration_complete) on_autocalibration_complete(range_sin, range_cos);
+                apply_calibration();
             }
-        }
+        } // else a sample for 'angle' already existed - no changes
     }
 }
 
@@ -72,4 +56,17 @@ void AutoCalibration::apply_configuration(Conf &conf)
 {
     set_score_valid_threshold(conf.get_calibration_threshold_factor());
     enable(conf.auto_cal==1);
+}
+
+void AutoCalibration::apply_calibration()
+{
+    if (is_calibration_valid()) 
+    {
+        if (on_autocalibration_complete) on_autocalibration_complete(range_sin, range_cos);
+    }
+    else
+    {
+        Log::trace("[AUTOCAL] Cannot apply calibration - invalid ranges\n");
+    }
+    reset();
 }

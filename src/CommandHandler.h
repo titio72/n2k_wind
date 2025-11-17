@@ -16,21 +16,13 @@ enum class CommandResult : uint8_t
     UNKNOWN_COMMAND = 7
 };
 
-class ManualCalibration;
 class AutoCalibration;
 class Conf;
-
-struct CommandContext
-{
-    Conf &conf;
-    AutoCalibration &auto_calibration;
-    ManualCalibration &manual_calibration;
-};
 
 class CommandHandler
 {
 public:
-    CommandHandler(CommandContext ctx);
+    CommandHandler(Conf &conf, AutoCalibration &cal);
 
     CommandResult on_command(int handle, const char *value);
 
@@ -38,8 +30,6 @@ public:
     
 private:
     Conf &conf;
-    
-    ManualCalibration &manual_calibration;
     AutoCalibration &auto_calibration;
     unsigned long last_BT_is_alive;
 
@@ -48,12 +38,12 @@ private:
     CommandResult command_set_calibration(const char *command_value);
     CommandResult command_finalize_calibration();
     CommandResult command_abort_calibration();
-    CommandResult command_start_calibration();
     CommandResult command_set_speed_smoothing(const char *command_value);
     CommandResult command_set_angle_smoothing(const char *command_value);
     CommandResult command_set_auto_calibration_threshold(const char *command_value);
     CommandResult command_toggle_autocalib();
     CommandResult command_toggle_debug();
     CommandResult command_factory_reset();
+    CommandResult command_heartbeat();
 };
 #endif

@@ -28,10 +28,7 @@ private:
 
     unsigned long counter = 0;
     int state = LOW;
-    unsigned long last_state_change_time = 0;
 
-    unsigned long period = 0;
-    double smooth_period = 0.0;
     double smooth_counter = 0.0;
 };
 

@@ -1,21 +1,29 @@
 #include "CommandHandler.h"
 #include <Arduino.h>
 #include <Log.h>
-#include "Conf.h"
+#include "DataAndConf.h"
 #include "SinCosDecoder.h"
 #include "WindSpeed.h"
 #include "WindDirection.h"
-#include "ManualCalibration.h"
 #include "AutoCalibration.h"
 
-void apply_calibration(const Range &sin, const Range& cos, Conf &conf)
+CommandResult apply_calibration(Range &sin, Range& cos, Conf &conf)
 {
-    conf.cos_range.set(cos);
-    conf.sin_range.set(sin);
+    if (cos.is_valid() && sin.is_valid())
+    {
+        conf.cos_range.set(cos);
+        conf.sin_range.set(sin);
+        return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    }
+    else
+    {
+        Log::trace("[CMD] Manual calibration invalid\n");
+        return CommandResult::INVALID_FORMAT;
+    }
 }
 
-CommandHandler::CommandHandler(CommandContext ctx) : conf(ctx.conf),
-                                                     last_BT_is_alive(0), manual_calibration(ctx.manual_calibration), auto_calibration(ctx.auto_calibration)
+CommandHandler::CommandHandler(Conf &c, AutoCalibration &cal) : conf(c), auto_calibration(cal),
+                                                     last_BT_is_alive(0)
 {
 }
 
@@ -24,7 +32,7 @@ CommandResult CommandHandler::on_command(int handle, const char *value)
     if (value && value[0])
     {
         const char command = value[0];
-        const char *command_value = (value + sizeof(char));
+        const char *command_value = (value + sizeof(char)); // skip the first char (which is the command code)
         switch (command)
         {
         case 'K': // Set speed adj
@@ -37,13 +45,10 @@ CommandResult CommandHandler::on_command(int handle, const char *value)
             return command_abort_calibration();
         case 'R': // Finalize calibration
             return command_finalize_calibration();
-        case 'C': // Start calibration
-            return command_start_calibration();
         case 'X': // Calibration factory reset
             return command_factory_reset();
         case 'H': // Heartbeat
-            last_BT_is_alive = millis();
-            return CommandResult::SUCCESS;
+            return command_heartbeat(); 
         case 'W': // change LPF alpha for the speed smoothing
             return command_set_speed_smoothing(command_value);
         case 'Q': // change LPF alpha for the direction smoothing
@@ -68,6 +73,12 @@ CommandResult CommandHandler::on_command(int handle, const char *value)
 unsigned long CommandHandler::get_last_BT_activity()
 {
     return last_BT_is_alive;
+}
+
+CommandResult CommandHandler::command_heartbeat()
+{
+    last_BT_is_alive = millis();
+    return CommandResult::SUCCESS;
 }
 
 CommandResult CommandHandler::command_set_speed_adj(const char *command_value)
@@ -143,16 +154,7 @@ CommandResult CommandHandler::command_set_calibration(const char *command_value)
     {
         Range s_range((uint16_t)vv[0], (uint16_t)vv[1], RANGE_DEFAULT_VALID);
         Range c_range((uint16_t)vv[2], (uint16_t)vv[3], RANGE_DEFAULT_VALID);
-        if (c_range.valid() && s_range.valid())
-        {
-            apply_calibration(s_range, c_range, conf);
-            return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-        }
-        else
-        {
-            Log::trace("[CMD] Manual calibration invalid\n");
-            return CommandResult::INVALID_FORMAT;
-        }
+        return apply_calibration(s_range, c_range, conf);
     }
     else
     {
@@ -164,31 +166,22 @@ CommandResult CommandHandler::command_set_calibration(const char *command_value)
 CommandResult CommandHandler::command_finalize_calibration()
 {
     Log::trace("[CMD] finalize calibration\n");
-    manual_calibration.finalize();
+    auto_calibration.apply_calibration();
     return CommandResult::SUCCESS;
 }
 
 CommandResult CommandHandler::command_factory_reset()
 {
     Log::trace("[CMD] Reset calibration to default\n");
-    Range def_range;
-    apply_calibration(def_range, def_range, conf);
     conf.offset = 0;
-    return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    Range def_range;
+    return apply_calibration(def_range, def_range, conf);
 }
 
 CommandResult CommandHandler::command_abort_calibration()
 {
     Log::trace("[CMD] Abort calibration\n");
-    manual_calibration.abort();
-    return CommandResult::SUCCESS;
-}
-
-CommandResult CommandHandler::command_start_calibration()
-{
-    Log::trace("[CMD] Starting calibration\n");
-    manual_calibration.start();
-    auto_calibration.enable(false);
+    auto_calibration.reset();
     return CommandResult::SUCCESS;
 }
 
@@ -201,6 +194,8 @@ CommandResult CommandHandler::command_set_speed_smoothing(const char *command_va
         if (atoi_x(smoothing, command_value))
         {
             uint32_t uSmoothing = smoothing & 0xFF; // trim to 0..255
+            uSmoothing = (uSmoothing<SMOOTHING_ALPHA_MIN)?SMOOTHING_ALPHA_MIN:uSmoothing;
+            uSmoothing = (uSmoothing>SMOOTHING_ALPHA_MAX)?SMOOTHING_ALPHA_MAX:uSmoothing;
             Log::trace("[CAL] New speed smoothing {%d} alpha {%.2f}\n", uSmoothing, conf.get_speed_smoothing_factor());
             conf.speed_smoothing = uSmoothing;
             return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
@@ -227,6 +222,8 @@ CommandResult CommandHandler::command_set_angle_smoothing(const char *command_va
         if (atoi_x(smoothing, command_value))
         {
             uint32_t uSmoothing = smoothing & 0xFF; // trim to 0..255
+            uSmoothing = (uSmoothing<SMOOTHING_ALPHA_MIN)?SMOOTHING_ALPHA_MIN:uSmoothing;
+            uSmoothing = (uSmoothing>SMOOTHING_ALPHA_MAX)?SMOOTHING_ALPHA_MAX:uSmoothing;
             conf.angle_smoothing = uSmoothing;
             Log::trace("[CAL] New angle smoothing {%d} alpha {%.2f}\n", uSmoothing, conf.get_angle_smoothing_factor());
             return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
@@ -253,19 +250,21 @@ CommandResult CommandHandler::command_set_auto_calibration_threshold(const char 
         if (atoi_x(threshold, command_value))
         {
             uint8_t uT = threshold & 0xFF; // trim to 0..255
+            uT = (uT<AUTO_CALIB_THRESHOLD_MIN)?AUTO_CALIB_THRESHOLD_MIN:uT;
+            uT = (uT>AUTO_CALIB_THRESHOLD_MAX)?AUTO_CALIB_THRESHOLD_MAX:uT;
             Log::trace("[CAL] New auto calibration threshold {%d} {%.2f}\n", uT, conf.get_calibration_threshold_factor());
             conf.calibration_score_threshold = uT;
             return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
         }
         else
         {
-            Log::trace("[CAL] Invalid angle smoothing\n");
+            Log::trace("[CAL] Invalid auto calibration threshold\n");
             return CommandResult::INVALID_FORMAT;
         }
     }
     else
     {
-        Log::trace("[CAL] Invalid angle smoothing\n");
+        Log::trace("[CAL] Invalid auto calibration threshold\n");
         return CommandResult::MISSING_INPUT;
     }
 }
@@ -283,7 +282,6 @@ CommandResult CommandHandler::command_toggle_autocalib()
         conf.auto_cal = 1;
         auto_calibration.reset();
         auto_calibration.enable(true);
-        manual_calibration.abort();
     }
     return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }
@@ -294,13 +292,11 @@ CommandResult CommandHandler::command_toggle_debug()
     conf.usb_tracing = !conf.usb_tracing;
     if (conf.usb_tracing)
     {
-        //Serial.begin(115200);
         Log::enable();
     }
     else
     {
         Log::disable();
-        //Serial.end();
     }
     return conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }

@@ -5,20 +5,20 @@
 #include <stdio.h>
 
 #pragma region Range
-Range::Range() : l(RANGE_DEFAULT_MIN), h(RANGE_DEFAULT_MAX), valid_span(RANGE_DEFAULT_VALID) {} // init invalid
+Range::Range() : l(RANGE_DEFAULT_MIN), h(RANGE_DEFAULT_MAX), minimum_valid_span(RANGE_DEFAULT_VALID) {} // init invalid
 
-Range::Range(uint16_t _low, uint16_t _high, uint16_t _valid_span) : l(_low), h(_high), valid_span(_valid_span) {}
+Range::Range(uint16_t _low, uint16_t _high, uint16_t _valid_span) : l(_low), h(_high), minimum_valid_span(_valid_span) {}
 
-bool Range::valid()
+bool Range::is_valid()
 {
-    return size() > valid_span;
+    return range() > minimum_valid_span;
 }
 
 void Range::set(const Range& r)
 {
      l = r.l;
      h = r.h;
-     valid_span = r.valid_span;
+     minimum_valid_span = r.minimum_valid_span;
 }
 
 void Range::set(uint16_t low, uint16_t high)
@@ -26,15 +26,20 @@ void Range::set(uint16_t low, uint16_t high)
     l = low;
     h = high;
 }
-#pragma endregion
 
-double to_analog(uint16_t reading, double v_low, double v_high, Range range)
+void Range::expand(uint16_t new_sample)
 {
-    if (range.valid())
+    l = l<new_sample ? l : new_sample;
+    h = h>new_sample ? h : new_sample;
+}
+
+double Range::to_analog(double v_low, double v_high, uint16_t reading)
+{
+    if (is_valid())
     {
         double d_r = reading;
-        double d_l = range.low();
-        double d_s = range.size();
+        double d_l = low();
+        double d_s = range();
         return (d_r - d_l) * (v_high - v_low) / d_s + v_low;
     }
     else
@@ -43,16 +48,11 @@ double to_analog(uint16_t reading, double v_low, double v_high, Range range)
     }
 }
 
-uint16_t to_digital(double value, double v_low, double v_high, Range range)
+#pragma endregion
+
+double to_analog(uint16_t reading, double v_low, double v_high, Range range)
 {
-    if (range.valid() && (v_low < v_high))
-    {
-        return (uint16_t)((value - v_low) / (v_high - v_low) * range.size() + range.low() + 0.5);
-    }
-    else
-    {
-        return UINT16_MAX;
-    }
+    return range.to_analog(v_low, v_high, reading);
 }
 
 double norm_deg(double d)
@@ -70,20 +70,6 @@ int16_t norm_deg(int16_t d)
         return (d % 360) + 360;
     else
         return d % 360;
-}
-
-double get_angle_deg(uint16_t sin_reading, Range &sin_calibration, int16_t cos_reading, Range &cos_calibration)
-{
-    double v_sin = to_analog(sin_reading, -1, 1, sin_calibration);
-    double v_cos = to_analog(cos_reading, -1, 1, cos_calibration);
-    return norm_deg(to_radians(atan2(v_sin, v_cos)));
-}
-
-int16_t get_noise(int16_t amplitude)
-{
-    double r = ((double)rand() / (double)RAND_MAX);
-    double v = (r * amplitude - 0.5 * amplitude);
-    return (int16_t)(v + 0.5);
 }
 
 char *mystrtok(char **m, char *s, char c)
@@ -128,7 +114,7 @@ bool atoi_x(int32_t &value, const char *s_value)
     }
 }
 
-bool parse_value(int32_t &target_value, const char *s_value, uint16_t max_value)
+bool parse_value(int32_t &target_value, const char *s_value, int32_t max_value)
 {
     int32_t value = -1;
     if (s_value && atoi_x(value, s_value) && value > 0 && value <= max_value)

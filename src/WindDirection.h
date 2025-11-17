@@ -2,15 +2,13 @@
 #define _WIND_DIRECTION_H
 #include <stdint.h>
 #include "SinCosDecoder.h"
-#include "WindAngleSImulator.h"
+#include "DataAndConf.h"
 
 class WindDirection
 {
 public:
-    WindDirection(SinCosDecoder &wcalc);
+    WindDirection();
     ~WindDirection();
-
-    double get_expected();
 
     void setup();
 
@@ -20,13 +18,14 @@ public:
 
     unsigned long get_sample_age() { return last_read_time; }
 
+    void apply_configuration(Conf &conf);
+
 private:
-    SinCosDecoder &w_calc;
-    double expected;
-    uint16_t *sinBuffer, *cosBuffer;
+    SinCosDecoder w_calc;
+    uint16_t sinBuffer[SIN_COS_BUFFER_SIZE];
+    uint16_t cosBuffer[SIN_COS_BUFFER_SIZE];
     uint16_t ix_buffer_sin, ix_buffer_cos;
     double sumSin, sumCos;
-
     unsigned long last_read_time = 0;
 };
 #endif

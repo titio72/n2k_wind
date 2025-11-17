@@ -6,7 +6,7 @@
 #include <Log.h>
 #include <BTInterface.h>
 #include "WindUtil.h"
-#include "Conf.h"
+#include "DataAndConf.h"
 #include "CommandHandler.h"
 
 #define MAX_BLE_DATA_BUFFER_SIZE 128
@@ -34,30 +34,33 @@ public:
         bt.begin();
     }
 
-    void send_BLE(wind_data& wdata, Conf &conf, Wind360 &calib_progress)
+    void send_BLE(wind_data& wdata, AutoCalibration &calib)
     {
         uint32_t mem = wdata.heap;
         uint16_t i_angle = ((int16_t)(wdata.angle * 10 + 0.5) + 3600) % 3600;  
         uint16_t i_smooth_angle = ((int16_t)(wdata.smooth_angle * 10 + 0.5) + 3600) % 3600;
+        uint16_t i_output_angle = ((i_smooth_angle + wdata.conf.offset * 10)) + 3600 % 3600;
         uint16_t i_ellipse = (uint16_t)round(wdata.ellipse * 1000);
         uint16_t i_speed = isnan(wdata.speed) ? 0 : (uint16_t)(wdata.speed * 10 + 0.5);
 
         static ByteBuffer buffer(MAX_BLE_DATA_BUFFER_SIZE);
-        buffer << i_angle << i_smooth_angle << i_ellipse 
+        buffer << i_angle << i_smooth_angle << i_output_angle << i_ellipse 
                 << mem << wdata.error
-                << wdata.i_sin << conf.sin_range.low() << conf.sin_range.high()
-                << wdata.i_cos << conf.cos_range.low() << conf.cos_range.high()
+                << wdata.i_sin << wdata.conf.sin_range.low() << wdata.conf.sin_range.high()
+                << wdata.i_cos << wdata.conf.cos_range.low() << wdata.conf.cos_range.high()
                 << i_speed << wdata.error_speed 
-                << (int32_t)conf.offset
-                << (uint16_t)conf.speed_adjustment 
-                << conf.n2k_source
-                << conf.angle_smoothing << conf.speed_smoothing
-                << conf.calibration_score_threshold
-                << conf.auto_cal
-                << calib_progress
+                << (int32_t)wdata.conf.offset
+                << (uint16_t)wdata.conf.speed_adjustment 
+                << wdata.conf.n2k_source
+                << wdata.conf.angle_smoothing
+                << wdata.conf.speed_smoothing
+                << wdata.conf.calibration_score_threshold
+                << wdata.conf.auto_cal
+                << calib.get_wind360()
                 << wdata.n2k_err
-                << get_vane_type();
-
+                << get_vane_type()
+                << ((uint8_t)(calib.is_calibration_valid()?1:0))
+                << ((uint8_t)(calib.is_calibration_in_score()?1:0));
 
         if (buffer.length() > MAX_BLE_DATA_BUFFER_SIZE)
         {
@@ -84,7 +87,7 @@ public:
 
 private:
     BTInterface bt;
-    CommandHandler cmd_handler;
+    CommandHandler &cmd_handler;
     bool alive;
 
     int ble_command_handle = -1;

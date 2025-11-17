@@ -1,8 +1,7 @@
 #include <Arduino.h>
 #include <Log.h>
 #include <EEPROM.h>
-#include "Conf.h"
-#include <Preferences.h>
+#include "DataAndConf.h"
 
 bool Conf::write()
 {
