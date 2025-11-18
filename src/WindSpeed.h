@@ -24,7 +24,8 @@ public:
 
 private:
     unsigned long last_read_time = 0;
-    double hz_to_knots;
+    double adjustment_factor = 1.0;
+    uint8_t vane_type;
 
     unsigned long counter = 0;
     int state = LOW;

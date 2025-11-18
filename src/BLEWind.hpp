@@ -58,7 +58,7 @@ public:
                 << wdata.conf.auto_cal
                 << calib.get_wind360()
                 << wdata.n2k_err
-                << get_vane_type()
+                << wdata.conf.vane_type
                 << ((uint8_t)(calib.is_calibration_valid()?1:0))
                 << ((uint8_t)(calib.is_calibration_in_score()?1:0));
 

@@ -9,7 +9,7 @@ class Conf;
 class AutoCalibration
 {
 public:
-    AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range) = nullptr);
+    AutoCalibration(calibration_callback on_complete = nullptr);
     ~AutoCalibration();
 
     void enable(bool e) { enabled = e; }
@@ -35,6 +35,8 @@ public:
     Range get_candidate_range_sin() { return range_sin; }
     Range get_candidate_range_cos() { return range_cos; }
 
+    calibration_callback get_callback() { return on_autocalibration_complete; }
+
 private:
     bool enabled;
     Range range_sin;
@@ -42,7 +44,7 @@ private:
     
     Wind360 wind360;
 
-    void (*on_autocalibration_complete)(Range &s_range, Range &c_range);
+    calibration_callback on_autocalibration_complete;
 
     double score_valid_threshold;
 };

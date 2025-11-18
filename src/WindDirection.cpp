@@ -3,6 +3,8 @@
 #include "WindDirection.h"
 #include "WindUtil.h"
 
+#define SAMPLE_BUFFERING
+
 WindDirection::WindDirection() : ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
 {
     memset(sinBuffer, 0, sizeof(uint16_t) * SIN_COS_BUFFER_SIZE);
@@ -21,12 +23,14 @@ void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s)
     ix = (ix + 1) % SIN_COS_BUFFER_SIZE;
 }
 
-void WindDirection::loop_micros(unsigned long now_micros) // this is called from an ISR every 1ms
+void IRAM_ATTR WindDirection::loop_micros(unsigned long now_micros) // this is called from an ISR every 1ms
 {
+    #ifdef SAMPLE_BUFFERING
     uint16_t i_sin = analogRead(SIN_PIN);
     uint16_t i_cos = analogRead(COS_PIN);
     buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
     buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
+    #endif
 }
 
 void WindDirection::setup()
@@ -40,8 +44,13 @@ void WindDirection::setup()
 
 void WindDirection::read_data(wind_data &wd, unsigned long milliseconds)
 {
+    #ifdef SAMPLE_BUFFERING
     wd.i_cos = (uint16_t)round(sumCos / SIN_COS_BUFFER_SIZE);
     wd.i_sin = (uint16_t)round(sumSin / SIN_COS_BUFFER_SIZE);
+    #else
+    wd.i_cos = analogRead(COS_PIN);
+    wd.i_sin = analogRead(SIN_PIN);
+    #endif
     w_calc.set_reading(wd.i_sin, wd.i_cos);
     wd.ellipse = w_calc.get_ellipse();
     wd.angle = w_calc.get_angle();

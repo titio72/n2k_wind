@@ -32,18 +32,5 @@ private:
     Conf &conf;
     AutoCalibration &auto_calibration;
     unsigned long last_BT_is_alive;
-
-    CommandResult command_set_speed_adj(const char *command_value);
-    CommandResult command_set_offset(const char *command_value);
-    CommandResult command_set_calibration(const char *command_value);
-    CommandResult command_finalize_calibration();
-    CommandResult command_abort_calibration();
-    CommandResult command_set_speed_smoothing(const char *command_value);
-    CommandResult command_set_angle_smoothing(const char *command_value);
-    CommandResult command_set_auto_calibration_threshold(const char *command_value);
-    CommandResult command_toggle_autocalib();
-    CommandResult command_toggle_debug();
-    CommandResult command_factory_reset();
-    CommandResult command_heartbeat();
 };
 #endif

@@ -26,21 +26,19 @@ The magic number to convert Hz in Knots is 2*(pi*0.055*2600/1852) = 0.672
 On ST60 
 Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which would mean a factor of 1.0 instead of 0.672
 */
-#ifndef VANE_TYPE
-#define VANE_TYPE 0 // ST50
-//#define VANE_TYPE 1 // ST60
-#endif
-#if VANE_TYPE==0
-#define HZ_TO_KNOTS 0.672f // use 0.672f for ST50
-#else
-#define HZ_TO_KNOTS 1.000f // use 1.000f for ST60
-#endif
+#define VANE_TYPE_ST50 0
+#define VANE_TYPE_ST60 1
+
+#define VANE_TYPE_DEFAULT VANE_TYPE_ST50 // ST50
+
+#define HZ_TO_KNOTS_ST50 0.672 // use 0.672 for ST50
+#define HZ_TO_KNOTS_ST60 1.000 // use 1.000 for ST60
 
 // Sin and Cos are calculated as moving average over N samples
 #define SIN_COS_BUFFER_SIZE 200 // about 0.2s averaging at 1ms rate 
 
 // main loop
-#define MAIN_LOOP_PERIOD_LOW_FREQ 250000L // (micros) regulates the main loop used to read sensors and interacts with N2K & BLE
+#define MAIN_LOOP_PERIOD_LOW_FREQ 200000L // (micros) regulates the main loop used to read sensors and interacts with N2K & BLE
 #define WIND_N2K_DATA_FREQ 500000L // (micros) regulates how frequently send out wind info on the N2K bus
 #define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 30000L // (millis) do not take samples for 30 seconds after restart (sample would be funny)
 #define CPU_FREQUENCY 80 // MHz (ESP32 default is 160). 80 is the lower value that makes the device operable
@@ -59,6 +57,7 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 // of the sin and cos sensors is off. This define the admissible delta, which essentially mesaure the eccentricity of measure.
 #define ELLIPSE_VALIDITY_THRESHOLD 0.2
 
+// admissible value ranges for configuration 
 #define SMOOTHING_ALPHA_MIN 0
 #define SMOOTHING_ALPHA_MAX 100
 

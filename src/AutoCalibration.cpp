@@ -2,10 +2,10 @@
 #include "DataAndConf.h"
 #include <Log.h>
 
-AutoCalibration::AutoCalibration(void (*on_complete)(Range &s_range, Range &c_range)) 
+AutoCalibration::AutoCalibration(calibration_callback cback) 
     : enabled(false), score_valid_threshold(0.8)
 {
-    on_autocalibration_complete = on_complete;
+    on_autocalibration_complete = cback;
     reset();
 }
 

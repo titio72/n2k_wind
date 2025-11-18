@@ -16,7 +16,7 @@
 #include "WindSystem.h"
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src);
-void on_calibration_complete(Range &s_range, Range &c_range);
+bool on_calibration_complete(Range &s_range, Range &c_range);
 
 #pragma region Global objects
 Conf conf;
@@ -85,10 +85,12 @@ void update_led(const wind_data &wdata)
 
 void do_log(const wind_data &wdata)
 {
-  Log::trace("[APP] Wind Sin/Cos {%d[%d..%d]/%d[%d..%d]} Dir {%5.1f[%5.1f]} Ellipse {%.1f} ErrCode {%d} Speed {%.1f} Freq {%.1f} ErrCodeSpeed {%d} Auto {%d}",
-             wdata.i_sin, conf.sin_range.low(), conf.cos_range.high(), wdata.i_cos, conf.cos_range.low(), conf.cos_range.high(),
-             wdata.angle, wdata.smooth_angle, wdata.ellipse, wdata.error,
-             wdata.speed, wdata.frequency, wdata.error_speed,
+  Log::trace("[APP] Wind %s Sin/Cos {%d[%d..%d]/%d[%d..%d] %.1f} Dir {%5.1f[%5.1f]} Speed {%.1fKn/%.1fHz} Auto {%d}",
+             wdata.conf.vane_type ? "ST60" : "ST50",
+             wdata.i_sin, conf.sin_range.low(), conf.sin_range.high(),
+             wdata.i_cos, conf.cos_range.low(), conf.cos_range.high(),
+             wdata.ellipse, wdata.angle, wdata.smooth_angle,
+             wdata.speed, wdata.frequency,
              auto_calibration.is_enabled());
 
   Wind360 &cal_progr = get_calibration_progress();
@@ -102,14 +104,24 @@ void do_log(const wind_data &wdata)
   Log::trace("                \r\n");
 }
 
-void on_calibration_complete(Range &s_range, Range &c_range)
+bool on_calibration_complete(Range &s_range, Range &c_range)
 {
-  conf.sin_range.set(s_range);
-  conf.cos_range.set(c_range);
-  conf.write();
-  Log::trace("[CAL] Calibration updated : sin {%d %d} cos {%d %d}\n",
-             conf.sin_range.low(), conf.sin_range.high(),
-             conf.cos_range.low(), conf.cos_range.high());
+  if (s_range.is_valid() && c_range.is_valid())
+  {
+    conf.sin_range.set(s_range);
+    conf.cos_range.set(c_range);
+    if (conf.write())
+    {
+      Log::trace("[CAL] Calibration updated : sin {%d %d} cos {%d %d}\n",
+               conf.sin_range.low(), conf.sin_range.high(),
+               conf.cos_range.low(), conf.cos_range.high());
+               return true;
+    }
+  }
+  Log::trace("[CAL] Calibration invalid : sin {%d %d} cos {%d %d}\n",
+              conf.sin_range.low(), conf.sin_range.high(),
+              conf.cos_range.low(), conf.cos_range.high());
+  return false;
 }
 
 void loop()
@@ -134,7 +146,7 @@ void loop()
     wind_speed.read_data(wdata, t_ms);
 
     // manage calibration
-    if (t_ms>CALIBRATION_SAMPLING_EXCLUSION_PERIOD) // do not sample for X seconds after restart
+    if (t_ms > CALIBRATION_SAMPLING_EXCLUSION_PERIOD) // do not sample for X seconds after restart
     {
       auto_calibration.record_reading(wdata.i_sin, wdata.i_cos, wdata.angle);
     }
@@ -154,7 +166,7 @@ void loop()
     }
     n2k_wind.loop(t_ms);
 
-    wdata.n2k_err = n2k_wind.is_n2k_err()?1:0;
+    wdata.n2k_err = n2k_wind.is_n2k_err() ? 1 : 0;
 
     do_log(wdata);
   }

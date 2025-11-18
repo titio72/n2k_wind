@@ -40,6 +40,8 @@ private:
     uint16_t minimum_valid_span;
 };
 
+typedef bool (*calibration_callback)(Range &s_range, Range &c_range);
+
 double to_analog(uint16_t reading, double v_low, double v_high, Range Range);
 
 double norm_deg(double d);

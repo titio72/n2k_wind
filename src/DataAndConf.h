@@ -19,7 +19,8 @@ public:
         n2k_source(DEFAULT_WIND_N2K_SOURCE), // default source address
         auto_cal(0), // auto calibration disabled by default
         calibration_score_threshold(80), // a calibration is valid to be committed when the score is higher than...
-        usb_tracing(1)
+        usb_tracing(1),
+        vane_type(VANE_TYPE_DEFAULT)
   {
   }
 
@@ -54,6 +55,7 @@ public:
   uint8_t auto_cal;
   uint8_t calibration_score_threshold;
   uint8_t usb_tracing;
+  uint8_t vane_type;
 
   bool write();
   bool read();
@@ -91,14 +93,4 @@ struct wind_data
       return norm_deg(smooth_angle + conf.offset);
     }
 };
-
-
-inline const char* get_vane_type()
-{
-    #if VANE_TYPE==0
-    return "ST50";
-    #else
-    return "ST60";
-    #endif
-}
 #endif
