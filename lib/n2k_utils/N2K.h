@@ -3,6 +3,11 @@
 
 #include <N2kMessages.h>
 #include "Utils.h"
+#include <vector>
+
+#ifndef N2K_SOURCE_DEFAULT
+#define N2K_SOURCE_DEFAULT  22
+#endif
 
 class tNMEA2000;
 
@@ -31,10 +36,14 @@ struct n2k_device_info
     uint16_t ManufacturerCode = 2046;   // Just choosen free from code list on http://www.nmea.org/Assets/20121020%20nmea%202000%20registration%20list.pdf
 };
 
+typedef void (*n2k_msg_handler)(const tN2kMsg &N2kMsg);
+typedef void (*n2k_source_change_handler)(const unsigned char old_source, const unsigned char new_source);
+typedef void (*n2k_sent_message_handler)(const tN2kMsg &N2kMsg, bool success);
+
 class N2K {
 
     public:
-        static N2K* get_instance(void (*_MsgHandler)(const tN2kMsg &N2kMsg), void (*_src_handler)(const unsigned char old_s, const unsigned char new_s));
+        static N2K* get_instance(n2k_msg_handler _msg_handler, n2k_source_change_handler _src_handler);
 
         virtual ~N2K();
 
@@ -46,6 +55,8 @@ class N2K {
 
         bool is_initialized();
 
+        bool is_bus_connected();
+
         // used only on linux
         void set_can_socket_name(const char* name);
 
@@ -56,15 +67,14 @@ class N2K {
 
         void add_pgn(unsigned long pgns);
 
-        static void set_sent_message_callback(void (*_MsgHandler)(const tN2kMsg &N2kMsg, bool success));
+        static void set_sent_message_callback(n2k_sent_message_handler _MsgHandler);
 
     private:
         N2K();
         tNMEA2000* NMEA2000;
         char socket_name[32];
         unsigned char desired_source;
-        unsigned long* pgns;
-        int n_pgns;
+        std::vector<unsigned long> pgns;
         n2k_device_info device_info;
 
 };

@@ -2,10 +2,13 @@
 #include "Log.h"
 #include "Utils.h"
 #include <Arduino.h>
+#include <string.h>
 
 Port::Port(const char *name): bytes(0), listener(NULL), pos(0), last_speed(DEFAULT_PORT_SPEED), speed(DEFAULT_PORT_SPEED), last_open_try(0)
 {
-	strcpy(port_name, name);
+	// bounded copy to avoid overflow
+	strncpy(port_name, name, sizeof(port_name) - 1);
+	port_name[sizeof(port_name) - 1] = '\0';
 }
 
 Port::~Port()

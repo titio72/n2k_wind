@@ -9,7 +9,7 @@ Range::Range() : l(RANGE_DEFAULT_MIN), h(RANGE_DEFAULT_MAX), minimum_valid_span(
 
 Range::Range(uint16_t _low, uint16_t _high, uint16_t _valid_span) : l(_low), h(_high), minimum_valid_span(_valid_span) {}
 
-bool Range::is_valid()
+bool Range::is_valid() const
 {
     return range() > minimum_valid_span;
 }
@@ -33,7 +33,7 @@ void Range::expand(uint16_t new_sample)
     h = h>new_sample ? h : new_sample;
 }
 
-double Range::to_analog(double v_low, double v_high, uint16_t reading)
+double Range::to_analog(double v_low, double v_high, uint16_t reading) const
 {
     if (is_valid())
     {
@@ -47,12 +47,18 @@ double Range::to_analog(double v_low, double v_high, uint16_t reading)
         return NAN;
     }
 }
-
 #pragma endregion
 
-double to_analog(uint16_t reading, double v_low, double v_high, Range range)
+void set_error(uint8_t& error, bool condition, uint8_t error_flag)
 {
-    return range.to_analog(v_low, v_high, reading);
+    if (condition)
+    {
+        error |= error_flag;
+    }
+    else
+    {
+        error &= ~error_flag;
+    }
 }
 
 double norm_deg(double d)
@@ -114,10 +120,10 @@ bool atoi_x(int32_t &value, const char *s_value)
     }
 }
 
-bool parse_value(int32_t &target_value, const char *s_value, int32_t max_value)
+bool parse_value(int32_t &target_value, const char *s_value, int32_t max_value, int32_t min_value)
 {
     int32_t value = -1;
-    if (s_value && atoi_x(value, s_value) && value > 0 && value <= max_value)
+    if (s_value && atoi_x(value, s_value) && value >= min_value && value <= max_value)
     {
         target_value = value;
         return true;
@@ -167,7 +173,7 @@ ByteBuffer::~ByteBuffer()
     delete[] buffer;
 }
 
-ByteBuffer& ByteBuffer::operator<< (Wind360 &w)
+ByteBuffer& ByteBuffer::operator<< (const Wind360 &w)
 {
     *this << (uint8_t)w.size();
     for (int i = 0; i < w.buffer_size(); i++) *this << (uint8_t)w.get_data(i);

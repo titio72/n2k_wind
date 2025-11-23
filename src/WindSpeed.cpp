@@ -39,10 +39,9 @@ void WindSpeed::read_data(wind_data &data, unsigned long milliseconds)
     data.frequency = (dt>50) ? (smooth_counter * 1000.0 / (double)dt)  : 0.0;
     data.frequency /= 2.0; // divide by 2 because there are two sensors, hence two squares per revolution
     data.speed = data.frequency * adjustment_factor * ((vane_type==VANE_TYPE_ST60)?HZ_TO_KNOTS_ST60:HZ_TO_KNOTS_ST50);
-    data.error_speed = WIND_ERROR_OK;
+    data.speed_error = WIND_ERROR_OK;
     counter = 0;
   }
-
 }
 
 void WindSpeed::set_speed_adjustment(double f)

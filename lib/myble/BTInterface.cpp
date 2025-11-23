@@ -29,8 +29,10 @@ public:
 
     virtual void onWrite(BLECharacteristic *pCharacteristic, esp_ble_gatts_cb_param_t *param)
     {
-        static char v[16];
-        strcpy(v, pCharacteristic->getValue().c_str());
+        static char v[256];
+        // bounded copy of incoming value to local buffer
+        strncpy(v, pCharacteristic->getValue().c_str(), sizeof(v) - 1);
+        v[sizeof(v) - 1] = '\0';
         //Log::tracex("BLE", "Characteristic write", "UUID {%s} value {%s}", pCharacteristic->getUUID().toString().c_str(), v);
 
         int i = 0;
@@ -51,9 +53,11 @@ private:
 BTInterface::BTInterface(const char *uuid, const char *name) : serviceUUID(uuid), callback(NULL), pServer(NULL), pService(NULL)
 {
     if (name)
-        strcpy(device_name, name);
-    else
-        strcpy(device_name, "AB");
+        strncpy(device_name, name, sizeof(device_name) - 1);
+    else {
+        strncpy(device_name, "AB", sizeof(device_name) - 1);
+    }
+    device_name[sizeof(device_name) - 1] = '\0';
 
     listener = new MyCInCBack(&callback, settings);
     serverCBack = new MyServerCBack();
@@ -62,12 +66,6 @@ BTInterface::BTInterface(const char *uuid, const char *name) : serviceUUID(uuid)
 BTInterface::~BTInterface()
 {
     BLEDevice::deinit();
-    for (int i = 0; i < settings.size(); i++)
-        delete characteristicsSettings[i];
-    for (int i = 0; i < fields.size(); i++)
-        delete characteristicsFields[i];
-    delete pServer;
-    delete pService;
     delete listener;
     delete serverCBack;
 }
@@ -199,7 +197,8 @@ void BTInterface::loop(unsigned long milli_seconds)
 
 void BTInterface::set_device_name(const char *name)
 {
-    strcpy(device_name, name);
+    strncpy(device_name, name, sizeof(device_name) - 1);
+    device_name[sizeof(device_name) - 1] = '\0';
     if (pServer)
     {
         pServer->getAdvertising()->stop();

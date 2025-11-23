@@ -47,8 +47,8 @@ void Wind360::reset()
 {
     if (n_samples==0) return;
 
-    memset(data, 0, n_samples);
-    memset(scores, 0, n_samples);
+    if (data) memset(data, 0, n_samples * sizeof(uint8_t));
+    if (scores) memset(scores, 0, n_samples * sizeof(uint8_t));
     score = 0.0;
     tot = 0;
 }
@@ -73,9 +73,9 @@ bool Wind360::set_degree(double v, double ellipse)
     }
 }
 
-unsigned char Wind360::get_data(int ix)
+unsigned char Wind360::get_data(int ix) const
 {
-    if (n_samples==0) return 0;
+    if (n_samples==0 || ix<0 || ix>=buffer_size()) return 0;
 
     uint8_t c = 0;
     for (int i = 0; i<8; i++)
@@ -85,22 +85,27 @@ unsigned char Wind360::get_data(int ix)
     return c;
 }
 
-int16_t Wind360::buffer_size()
+int16_t Wind360::buffer_size() const
 {
     return n_samples / 8 + ((n_samples % 8)?1:0);
 }
 
-int16_t Wind360::size()
+int16_t Wind360::size() const
 {
     return n_samples;
 }
 
-bool Wind360::is_valid()
+int16_t Wind360::progress() const 
+{ 
+    return tot; 
+} 
+
+bool Wind360::is_valid() const
 {
     return tot >= n_samples;
 }
 
-double Wind360::get_score()
+double Wind360::get_score() const
 {
     return n_samples?(score / tot_score):0;
 }

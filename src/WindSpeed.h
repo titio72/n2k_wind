@@ -10,7 +10,7 @@ public:
     WindSpeed();
     ~WindSpeed();
 
-    unsigned long get_sample_age() { return last_read_time; }
+    unsigned long get_sample_age() const { return last_read_time; }
 
     void setup();
 

@@ -17,22 +17,23 @@ public:
      */
     bool set_degree(double d, double ellipse = 0.0);
 
-    bool is_valid();
+    bool is_valid() const;
 
     void reset();
 
-    int16_t progress() { return tot; }
+    int16_t progress() const;
 
-    int16_t size();
+    int16_t size() const;
 
-    double get_score();
+    double get_score() const;
 
-    int16_t buffer_size();
-    unsigned char get_data(int ix);
+    int16_t buffer_size() const;
+
+    unsigned char get_data(int ix) const;
 
 private:
-    unsigned char* data;
-    unsigned char* scores;
+    uint8_t* data;
+    uint8_t* scores;
     int16_t tot;
     double sample_size;
     double tot_score;

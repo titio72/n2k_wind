@@ -23,6 +23,13 @@ void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s)
     ix = (ix + 1) % SIN_COS_BUFFER_SIZE;
 }
 
+inline bool is_valid_reading(uint16_t reading)
+{
+    // The typical range is between 1/4 and 3/4 of the totla range, hence a minimum of 1024. Below 600, is certainly a bad reading or a disconnected sensor.
+    return reading <= MAX_ADC_VALUE && reading>600; // expand in future...
+}
+
+
 void IRAM_ATTR WindDirection::loop_micros(unsigned long now_micros) // this is called from an ISR every 1ms
 {
     #ifdef SAMPLE_BUFFERING
@@ -51,15 +58,27 @@ void WindDirection::read_data(wind_data &wd, unsigned long milliseconds)
     wd.i_cos = analogRead(COS_PIN);
     wd.i_sin = analogRead(SIN_PIN);
     #endif
-    w_calc.set_reading(wd.i_sin, wd.i_cos);
-    wd.ellipse = w_calc.get_ellipse();
-    wd.angle = w_calc.get_angle();
-    wd.smooth_angle = lpf_angle(wd.smooth_angle, wd.angle, wd.conf.get_angle_smoothing_factor());
-    wd.error = w_calc.get_error();
+    if (!is_valid_reading(wd.i_sin) || !is_valid_reading(wd.i_cos))
+    {
+        wd.ellipse = NAN;
+        wd.angle = NAN;
+        wd.smooth_angle = NAN;
+        set_error(wd.angle_error, true, WIND_ERROR_NO_SIGNAL);
+    }
+    else
+    {
+        double v_sin = sin_calib_range.to_analog(-1, 1, wd.i_sin);
+        double v_cos = cos_calib_range.to_analog(-1, 1, wd.i_cos);
+        wd.ellipse = sqrt(v_sin * v_sin + v_cos * v_cos);
+        wd.angle = norm_deg(to_degrees(atan2(v_sin, v_cos)));
+        wd.smooth_angle = lpf_angle(wd.smooth_angle, wd.angle, wd.conf.get_angle_smoothing_factor());
+        set_error(wd.angle_error, false, WIND_ERROR_NO_SIGNAL);
+    }
     last_read_time = milliseconds;
 }
 
 void WindDirection::apply_configuration(Conf &conf)
 {
-    w_calc.apply_configuration(conf);
+    sin_calib_range = conf.sin_range;
+    cos_calib_range = conf.cos_range;
 }

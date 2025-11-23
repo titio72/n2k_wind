@@ -21,7 +21,7 @@ class ABBLESetting {
 public:
     ABBLESetting(const char* n, const char* id): uuid(id)
     {
-        strcpy(name, n);
+        strncpy(name, n, sizeof(name) - 1);
     }
 
     char name[16];
@@ -32,7 +32,7 @@ class ABBLEField {
 public:
     ABBLEField(const char* n, const char* id): uuid(id)
     {
-        strcpy(name, n);
+        strncpy(name, n, sizeof(name) - 1);
     }
 
     char name[16];

@@ -2,15 +2,21 @@
 #include <Log.h>
 #include "CommandHandler.h"
 #include "DataAndConf.h"
-#include "AutoCalibration.h"
+#include "Calibration.h"
+#include "BLEWind.h"
 
 struct CommandContext
 {
     Conf &conf;
-    AutoCalibration &cal;
-    unsigned long last_BT_is_alive;
+    Calibration &cal;
+    BLEWind &ble;
 };
 
+/*
+The first char of the input is the "command", so there can be only 256 (plenty).
+The following characters are a null terminated string and they contains the payload (if any).
+Easy to parse and enough for the purpose.
+*/
 typedef CommandResult (*wind_command)(CommandContext &ctx, const char *command_value);
 wind_command commands[256];
 
@@ -31,83 +37,49 @@ CommandResult apply_calibration(Range &sin, Range& cos, calibration_callback cba
 CommandResult command_vane_type(CommandContext &ctx, const char* command_value)
 {
     Log::trace("[CMD] Setting vane type {%s}\n", command_value);
-    if (command_value[0])
+    int32_t vane = 0;
+    if (parse_value(vane, command_value, VANE_TYPE_ST60, VANE_TYPE_ST50))
     {
-        int32_t vane = 0;
-        if (atoi_x(vane, command_value))
-        {
-            if (vane==VANE_TYPE_ST50 || vane==VANE_TYPE_ST60)
-            {
-                Log::trace("[CMD] New vane type {%s}\n", vane==VANE_TYPE_ST50?"ST50":"ST60");
-                ctx.conf.vane_type = vane;
-                return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-            }
-        }
-        Log::trace("[CMD] Invalid vane type\n");
-        return CommandResult::INVALID_FORMAT;
+        Log::trace("[CMD] New vane type {%s}\n", vane==VANE_TYPE_ST50?"ST50":"ST60");
+        ctx.conf.vane_type = vane;
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
-    else
-    {
-        Log::trace("[CMD] Invalid vane type\n");
-        return CommandResult::MISSING_INPUT;
-    }
+    Log::trace("[CMD] Invalid vane type\n");
+    return CommandResult::INVALID_FORMAT;
 }
 
 CommandResult command_heartbeat(CommandContext &ctx, const char* command_value)
 {
-    ctx.last_BT_is_alive = millis();
+    // do nothing
     return CommandResult::SUCCESS;
 }
 
 CommandResult command_set_speed_adj(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CMD] Setting speed adjustment {%s}\n", command_value);
-    if (command_value[0])
+    int32_t adj = 0;
+    if (parse_value(adj, command_value, 255, 0))
     {
-        int32_t adj = 0;
-        if (atoi_x(adj, command_value))
-        {
-            uint32_t uiAdj = adj & 0xFF; // trim to 0..255
-            Log::trace("[CMD] New speed adjustment {%d}\n", uiAdj);
-            ctx.conf.speed_adjustment = uiAdj;
-            return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-        }
-        else
-        {
-            Log::trace("[CMD] Invalid speed adjustment\n");
-            return CommandResult::INVALID_FORMAT;
-        }
+        Log::trace("[CMD] New speed adjustment {%d}\n", adj);
+        ctx.conf.speed_adjustment = adj;
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
-    else
-    {
-        Log::trace("[CMD] Missing speed adjustment\n");
-        return CommandResult::MISSING_INPUT;
-    }
+    Log::trace("[CMD] Invalid speed adjustment\n");
+    return CommandResult::INVALID_FORMAT;
 }
 
 CommandResult command_set_offset(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CMD] Setting offset {%s}\n", command_value);
-    if (command_value[0])
+    int32_t offset = 0;
+    if (parse_value(offset, command_value, 360, -360))
     {
-        int32_t offset = 0;
-        if (atoi_x(offset, command_value))
-        {
-            Log::trace("[CMD] New offset {%d}\n", offset);
-            ctx.conf.offset = offset;
-            return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-        }
-        else
-        {
-            Log::trace("[CMD] Invalid offset\n");
-            return CommandResult::INVALID_FORMAT;
-        }
+        Log::trace("[CMD] New offset {%d}\n", offset);
+        ctx.conf.offset = offset;
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
-    else
-    {
-        Log::trace("[CMD] Invalid offset\n");
-        return CommandResult::MISSING_INPUT;
-    }
+    Log::trace("[CMD] Invalid offset\n");
+    return CommandResult::INVALID_FORMAT;
 }
 
 CommandResult command_set_calibration(CommandContext &ctx, const char *command_value)
@@ -117,7 +89,7 @@ CommandResult command_set_calibration(CommandContext &ctx, const char *command_v
     int32_t vv[] = {-1, -1, -1, -1};
     bool do_write = false;
     char s[256];
-    strcpy(s, command_value);
+    strncpy(s, command_value, sizeof(s));
     char *t, *p;
     for (t = mystrtok(&p, s, '|'); t && i_tok < 4; t = mystrtok(&p, 0, '|'))
     {
@@ -166,84 +138,45 @@ CommandResult command_abort_calibration(CommandContext &ctx, const char *command
 CommandResult command_set_speed_smoothing(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CAL] Setting speed smoothing {%s}\n", command_value);
-    if (command_value[0])
+    int32_t smoothing = 0;
+    if (parse_value(smoothing, command_value, SMOOTHING_ALPHA_MAX, SMOOTHING_ALPHA_MIN))
     {
-        int32_t smoothing = 0;
-        if (atoi_x(smoothing, command_value))
-        {
-            uint32_t uSmoothing = smoothing & 0xFF; // trim to 0..255
-            uSmoothing = (uSmoothing<SMOOTHING_ALPHA_MIN)?SMOOTHING_ALPHA_MIN:uSmoothing;
-            uSmoothing = (uSmoothing>SMOOTHING_ALPHA_MAX)?SMOOTHING_ALPHA_MAX:uSmoothing;
-            ctx.conf.speed_smoothing = uSmoothing;
-            Log::trace("[CAL] New speed smoothing {%d} alpha {%.2f}\n", uSmoothing, ctx.conf.get_speed_smoothing_factor());
-            return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-        }
-        else
-        {
-            Log::trace("[CAL] Invalid speed smoothing\n");
-            return CommandResult::INVALID_FORMAT;
-        }
+        ctx.conf.speed_smoothing = smoothing;
+        Log::trace("[CAL] New speed smoothing {%d} alpha {%.2f}\n", smoothing, ctx.conf.get_speed_smoothing_factor());
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
-    else
-    {
-        Log::trace("[CAL] Invalid speed smoothing\n");
-        return CommandResult::MISSING_INPUT;
-    }
+    Log::trace("[CAL] Invalid speed smoothing\n");
+    return CommandResult::INVALID_FORMAT;
 }
 
 CommandResult command_set_angle_smoothing(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CAL] Setting angle smoothing {%s}\n", command_value);
-    if (command_value[0])
+    int32_t smoothing = 0;
+    if (parse_value(smoothing, command_value, SMOOTHING_ALPHA_MAX, SMOOTHING_ALPHA_MIN))
     {
-        int32_t smoothing = 0;
-        if (atoi_x(smoothing, command_value))
-        {
-            uint32_t uSmoothing = smoothing & 0xFF; // trim to 0..255
-            uSmoothing = (uSmoothing<SMOOTHING_ALPHA_MIN)?SMOOTHING_ALPHA_MIN:uSmoothing;
-            uSmoothing = (uSmoothing>SMOOTHING_ALPHA_MAX)?SMOOTHING_ALPHA_MAX:uSmoothing;
-            ctx.conf.angle_smoothing = uSmoothing;
-            Log::trace("[CAL] New angle smoothing {%d} alpha {%.2f}\n", uSmoothing, ctx.conf.get_angle_smoothing_factor());
-            return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-        }
-        else
-        {
-            Log::trace("[CAL] Invalid angle smoothing\n");
-            return CommandResult::INVALID_FORMAT;
-        }
+        ctx.conf.angle_smoothing = smoothing;
+        Log::trace("[CAL] New angle smoothing {%d} alpha {%.2f}\n", smoothing, ctx.conf.get_angle_smoothing_factor());
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
-    else
-    {
-        Log::trace("[CAL] Invalid angle smoothing\n");
-        return CommandResult::MISSING_INPUT;
-    }
+    Log::trace("[CAL] Invalid angle smoothing\n");
+    return CommandResult::INVALID_FORMAT;
 }
 
 CommandResult command_set_auto_calibration_threshold(CommandContext &ctx, const char *command_value)
 {
-    Log::trace("[CAL] Setting autocalibration threshold {%s}\n", command_value);
-    if (command_value[0])
+    Log::trace("[CAL] Setting auto calibration threshold {%s}\n", command_value);
+    int32_t threshold = 0;
+    if (parse_value(threshold, command_value, AUTO_CALIB_THRESHOLD_MAX, AUTO_CALIB_THRESHOLD_MIN))
     {
-        int32_t threshold = 0;
-        if (atoi_x(threshold, command_value))
-        {
-            uint8_t uT = threshold & 0xFF; // trim to 0..255
-            uT = (uT<AUTO_CALIB_THRESHOLD_MIN)?AUTO_CALIB_THRESHOLD_MIN:uT;
-            uT = (uT>AUTO_CALIB_THRESHOLD_MAX)?AUTO_CALIB_THRESHOLD_MAX:uT;
-            Log::trace("[CAL] New auto calibration threshold {%d} {%.2f}\n", uT, ctx.conf.get_calibration_threshold_factor());
-            ctx.conf.calibration_score_threshold = uT;
-            return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
-        }
-        else
-        {
-            Log::trace("[CAL] Invalid auto calibration threshold\n");
-            return CommandResult::INVALID_FORMAT;
-        }
+        ctx.conf.calibration_score_threshold = threshold;
+        Log::trace("[CAL] New auto calibration threshold {%d} {%.2f}\n", threshold, ctx.conf.get_calibration_threshold_factor());
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     else
     {
         Log::trace("[CAL] Invalid auto calibration threshold\n");
-        return CommandResult::MISSING_INPUT;
+        return CommandResult::INVALID_FORMAT;
     }
 }
 
@@ -267,21 +200,40 @@ CommandResult command_toggle_autocalib(CommandContext &ctx, const char *command_
 CommandResult command_toggle_debug(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CAL] Toggle debug info on USB {%s}\n", ctx.conf.usb_tracing ? "OFF" : "ON");
-    ctx.conf.usb_tracing = !ctx.conf.usb_tracing;
-    if (ctx.conf.usb_tracing)
+    int32_t d = 0;
+    if (parse_value(d, command_value, 1, 0))
     {
-        Log::enable();
-    }
-    else
-    {
-        Log::disable();
+        ctx.conf.usb_tracing = d;
+        if (ctx.conf.usb_tracing)
+        {
+            Log::enable();
+        }
+        else
+        {
+            Log::disable();
+        }
     }
     return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }
+
+CommandResult command_change_ble_name(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CMD] Changing BLE name to {%s}\n", command_value);
+    if (command_value && strlen(command_value) < sizeof(ctx.conf.ble_name))
+    {
+        strncpy(ctx.conf.ble_name, command_value, sizeof(ctx.conf.ble_name) - 1);
+        ctx.conf.ble_name[sizeof(ctx.conf.ble_name) - 1] = 0;
+        ctx.ble.set_device_name(ctx.conf.ble_name);
+        Log::trace("[CMD] New BLE name {%s}\n", ctx.conf.ble_name);
+        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    }
+    Log::trace("[CMD] Invalid BLE name\n");
+    return CommandResult::INVALID_FORMAT;
+}
+
 #pragma endregion
 
-CommandHandler::CommandHandler(Conf &c, AutoCalibration &cal) : conf(c), auto_calibration(cal),
-                                                     last_BT_is_alive(0)
+CommandHandler::CommandHandler(Conf &c, Calibration &cal, BLEWind &b) : conf(c), auto_calibration(cal), ble(b)
 {
     memset(commands, 0, sizeof(commands));
     commands['K'] = command_set_speed_adj; // Set speed adj
@@ -297,9 +249,10 @@ CommandHandler::CommandHandler(Conf &c, AutoCalibration &cal) : conf(c), auto_ca
     commands['T'] = command_set_auto_calibration_threshold; // auto calibration threshold
     commands['D'] = command_toggle_debug; // enable/disable USB tracing
     commands['V'] = command_vane_type; // send vane type (0=ST50, 1=ST60)
+    commands['N'] = command_change_ble_name; // change BLE device name
 }
 
-CommandResult CommandHandler::on_command(int handle, const char *value)
+CommandResult CommandHandler::exec_command(const char *value)
 {
     if (value && value[0])
     {
@@ -308,12 +261,13 @@ CommandResult CommandHandler::on_command(int handle, const char *value)
         if (cmd)
         {
             const char *command_value = (value + sizeof(char)); // skip the first char (which is the command code)
-            CommandContext ctx = {conf, auto_calibration, last_BT_is_alive};
-            return cmd(ctx, command_value);
+            CommandContext ctx = {conf, auto_calibration, ble};
+            CommandResult res = cmd(ctx, command_value);
+            return res;
         }
         else
         {
-            Log::trace("[CAL] Unrecognized command {%s}\n", value);
+            Log::trace("[CMD] Unrecognized command {%s}\n", value);
             return CommandResult::UNKNOWN_COMMAND;
         }
     }
@@ -321,9 +275,4 @@ CommandResult CommandHandler::on_command(int handle, const char *value)
     {
         return CommandResult::MISSING_INPUT;
     }
-}
-
-unsigned long CommandHandler::get_last_BT_activity()
-{
-    return last_BT_is_alive;
 }

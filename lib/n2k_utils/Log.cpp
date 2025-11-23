@@ -74,6 +74,11 @@ void Log::disable()
 	enabled = false;
 }
 
+bool Log::is_enabled()
+{
+	return enabled;
+}
+
 void Log::debug(const char *text, ...)
 {
 	if (_debug && can_trace())

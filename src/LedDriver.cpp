@@ -8,7 +8,7 @@
 #define LED_PIN -1 // disable led
 #endif
 
-LedDriver::LedDriver(): blue(false), calib(false), error(WIND_ERROR_OK) {}
+LedDriver::LedDriver(): blue(false), running(false), error(WIND_ERROR_OK) {}
 
 LedDriver::~LedDriver() {}
 
@@ -17,40 +17,49 @@ void LedDriver::setup()
 
 }
 
-void set_led_color(int error, bool calibration, int& r, int& g, int& b)
+void set_led_color(uint8_t error, bool running, int& r, int& g, int& b)
 {
-    if (calibration)
+    if (error & WIND_ERROR_NO_SIGNAL)
     {
-        r = LED_INTENSITY / 2; g = LED_INTENSITY / 2; b = LED_INTENSITY / 2;
-    }
-    else {
+        // red
+        r = LED_INTENSITY;
+        g = 0;
         b = 0;
-        switch (error)
-        {
-            case WIND_ERROR_OK:
-            r = 0; g = LED_INTENSITY;
-            break;
-            case WIND_ERROR_NO_CAL_OR_SIGNAL:
-            r = LED_INTENSITY; g = 0;
-            break;
-            default:
-            r = 0; g = 0;
-            break;
-        }
+    }
+    else if (error != WIND_ERROR_OFF_CALIBRATION)
+    {
+        // orange
+        r = LED_INTENSITY;
+        g = LED_INTENSITY * 0.65;
+        b = 0;
+    }
+    else if (running)
+    {
+        // green
+        r = 0;
+        g = LED_INTENSITY;
+        b = 0;
+    }
+    else
+    {
+        // off
+        r = 0;
+        g = 0;
+        b = 0;
     }
 }
 
-void LedDriver::set_calibration(bool c)
+void LedDriver::set_running(bool c)
 {
-    calib = c;
+    running = c;
 }
 
-void LedDriver::set_blue(bool b)
+void LedDriver::set_bluetooth(bool b)
 {
     blue = b;
 }
 
-void LedDriver::set_error(int e)
+void LedDriver::set_error(uint8_t e)
 {
     error = e;
 }
@@ -63,16 +72,14 @@ void LedDriver::loop(unsigned long t)
   if ((t-t0)>=500)
   {
     t0 = t;
+    int r, g, b;
     if (led_on)
     {
-        int r, g, b;
-        set_led_color(error, calib, r, g, b);
-        neopixelWrite(LED_PIN, g, r, b);
+        set_led_color(error, running, r, g, b);
     }
     else
     {
-        int b = blue?LED_INTENSITY:0;
-        neopixelWrite(LED_PIN, 0, 0, b);
+        r = 0; g = 0; b = LED_INTENSITY;
     }
     led_on = !led_on;
   }

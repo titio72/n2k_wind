@@ -12,7 +12,9 @@
 
 LinuxPort::LinuxPort(const char* p_name): tty_fd(0)
 {
-    strcpy(port_name, p_name);
+	// bounded copy
+	strncpy(port_name, p_name, sizeof(port_name) - 1);
+	port_name[sizeof(port_name) - 1] = '\0';
 }
 
 LinuxPort::~LinuxPort()
@@ -22,7 +24,9 @@ LinuxPort::~LinuxPort()
 
 void LinuxPort::set_port_name(const char* pname)
 {
-    strcpy(port_name, p_name);
+	// bounded copy
+	strncpy(port_name, pname, sizeof(port_name) - 1);
+	port_name[sizeof(port_name) - 1] = '\0';
 }
 
 int fd_set_blocking(int fd, int blocking)

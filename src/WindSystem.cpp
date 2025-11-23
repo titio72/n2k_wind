@@ -1,25 +1,19 @@
 #include <Arduino.h>
 #include "WindSystem.h"
 #include "Constants.h"
+#include "DataAndConf.h"
 #include <Utils.h>
 #include <WiFi.h>
 #include <Log.h>
 
 static hw_timer_t *timer = nullptr;
 static void (*on_timer_callback)(unsigned long microseconds) = nullptr;
-static WindSystem *instance = nullptr;
+static LedDriver led;
 
 void IRAM_ATTR on_timer()
 {
     if (on_timer_callback)
         on_timer_callback(micros());
-}
-
-WindSystem &WindSystem::get_instance()
-{
-    if (instance == nullptr)
-        instance = new WindSystem();
-    return *instance;
 }
 
 void WindSystem::set_timer_callback(void (*on_timer_fnc)(unsigned long microseconds))
@@ -40,8 +34,17 @@ void WindSystem::enable_usb_tracing(bool enabled)
     }
 }
 
+LedDriver &WindSystem::get_led()
+{ 
+    return led; 
+}
+
 void WindSystem::setup()
 {
+    if (timer != nullptr)
+        return; // already initialized
+
+    // set CPU frequency
     setCpuFrequencyMhz(CPU_FREQUENCY);
 
     // initialize hw timer for wind measurement
@@ -49,4 +52,12 @@ void WindSystem::setup()
     timerAttachInterrupt(timer, &on_timer, true); // Attach the interrupt handling function
     timerAlarmWrite(timer, 1000, true);           // Interrupt every 1ms
     timerAlarmEnable(timer);                      // Enable the alarm
+
+    // initialize leds
+    led.setup();
+}
+
+void WindSystem::loop(unsigned long milliseconds)
+{
+    led.loop(milliseconds);
 }

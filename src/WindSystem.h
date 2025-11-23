@@ -2,17 +2,22 @@
 #define _WIND_SYSTEM_H
 
 #include <Arduino.h>
+#include "LedDriver.h"
+
+struct wind_data;
 
 class WindSystem
 {
 public:
-    static WindSystem &get_instance();
+    static void set_timer_callback(void (*on_timer_fnc)(unsigned long microseconds));
 
-    void set_timer_callback(void (*on_timer_fnc)(unsigned long microseconds));
+    static void enable_usb_tracing(bool enabled);
 
-    void enable_usb_tracing(bool enabled);
+    static void setup();
 
-    void setup();
+    static LedDriver &get_led();
+
+    static void loop(unsigned long milliseconds);
 
 private:
     WindSystem() {}

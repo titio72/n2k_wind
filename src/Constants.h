@@ -2,18 +2,29 @@
 #define _CONSTANTS_H
 
 // 12 bit ADC for ESP32, 16 bit ADC for ADS1115
+#define MIN_ADC_VALUE 400  // with a power supply of 8V, raymarine specs inidcate a range of 2V-6V, so 400/4096*8V=0.78V is a reasonable threshold
 #define MAX_ADC_VALUE 4095
-#define MAX_ADC_RANGE 4096
-#define RANGE_DEFAULT_MIN 1024
-#define RANGE_DEFAULT_MAX 3072
-#define RANGE_DEFAULT_VALID 512
+#define MAX_ADC_RANGE 4096 // 12 bit ADC
+#define RANGE_DEFAULT_MIN 1024 // default Raymarine specs: 2V over 8V span
+#define RANGE_DEFAULT_MAX 3072 // default Raymarine specs: 6V over 8V span
+#define RANGE_DEFAULT_VALID 1024 // minimum span to consider a range valid
 
-#define WIND_ERROR_NO_CAL_OR_SIGNAL 1
-#define WIND_ERROR_OK 0
+const uint8_t WIND_ERROR_OFF_CALIBRATION = 0x02; // (bit #1)
+const uint8_t WIND_ERROR_NO_SIGNAL = 0x01; // (bit #0)
+const uint8_t WIND_ERROR_OK = 0x00;
 
-#ifndef DEFAULT_WIND_N2K_SOURCE
-#define DEFAULT_WIND_N2K_SOURCE 32
+#ifndef DEFAULT_N2K_SOURCE
+#define DEFAULT_N2K_SOURCE 21
 #endif
+#define N2K_MODEL_SERIAL_CODE "0.0.1"
+#define N2K_PRODUCT_CODE 101
+#define N2K_MODEL_ID "ABWind"
+#define N2K_SW_CODE "0.0.1"
+#define N2K_MODEL_VERSION "0001"
+#define N2K_UNIQUE_NUMBER 2
+#define N2K_DEVICEE_FUNCTION 180
+#define N2K_DEVICE_CLASS 60
+#define N2K_MANIFACTURER_CODE 2046 // just one available...
 
 /*
 On ST50:
@@ -38,9 +49,9 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #define SIN_COS_BUFFER_SIZE 200 // about 0.2s averaging at 1ms rate 
 
 // main loop
-#define MAIN_LOOP_PERIOD_LOW_FREQ 200000L // (micros) regulates the main loop used to read sensors and interacts with N2K & BLE
-#define WIND_N2K_DATA_FREQ 500000L // (micros) regulates how frequently send out wind info on the N2K bus
-#define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 30000L // (millis) do not take samples for 30 seconds after restart (sample would be funny)
+#define MAIN_LOOP_PERIOD_LOW_FREQ 200L // (millis) regulates the main loop used to read sensors and interacts with N2K & BLE
+#define WIND_N2K_DATA_FREQ 500L // (millis) regulates how frequently send out wind info on the N2K bus
+#define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 10000L // (millis) do not take samples for 10 seconds after restart (sample would be funny)
 #define CPU_FREQUENCY 80 // MHz (ESP32 default is 160). 80 is the lower value that makes the device operable
 
 // BLE
@@ -52,6 +63,7 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #define BLE_COMMAND_CHARACTERISTIC_NAME "command"
 #define BLE_DATA_CHARACTERISTIC_NAME "data"
 #define BLE_CONF_CHARACTERISTIC_NAME "conf"
+#define BLE_ACTIVITY_TIMEOUT 30000L // (millis) time after which we consider that the connection is dead if no command is received
 
 // The reading gives sin and cos, and sqrt(sin^2+cos^2 )must be equal to 1.0, or close to it. Large differences means that the linearization
 // of the sin and cos sensors is off. This define the admissible delta, which essentially mesaure the eccentricity of measure.

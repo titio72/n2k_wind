@@ -16,21 +16,20 @@ enum class CommandResult : uint8_t
     UNKNOWN_COMMAND = 7
 };
 
-class AutoCalibration;
+class Calibration;
 class Conf;
+class BLEWind;
 
 class CommandHandler
 {
 public:
-    CommandHandler(Conf &conf, AutoCalibration &cal);
+    CommandHandler(Conf &conf, Calibration &cal, BLEWind &ble);
 
-    CommandResult on_command(int handle, const char *value);
-
-    unsigned long get_last_BT_activity();
+    CommandResult exec_command(const char *value);
     
 private:
     Conf &conf;
-    AutoCalibration &auto_calibration;
-    unsigned long last_BT_is_alive;
+    Calibration &auto_calibration;
+    BLEWind &ble;
 };
 #endif

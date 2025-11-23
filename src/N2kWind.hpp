@@ -12,7 +12,7 @@
 class N2KWind
 {
 public:
-    N2KWind(void (*on_src)(uint8_t old_src, uint8_t new_src)) : n2k(*N2K::get_instance(NULL, on_src)), src(DEFAULT_WIND_N2K_SOURCE), no_stats(true)
+    N2KWind(n2k_source_change_handler on_src) : n2k(*N2K::get_instance(nullptr, on_src)), src(DEFAULT_N2K_SOURCE), no_stats(true), n2k_err(false)
     {
     }
 
@@ -23,22 +23,28 @@ public:
             n2k.set_desired_source(src);
             n2k.add_pgn(130306L);
             n2k_device_info info;
-            info.ModelSerialCode = "0.0.1";
-            info.ProductCode = 101;
-            info.ModelID = "ABWind";
-            info.SwCode = "0.0.1";
-            info.ModelVersion = "0001";
-            info.UniqueNumber = 2;
-            info.DeviceFunction = 180;
-            info.DeviceClass = 60;
-            info.ManufacturerCode = 2046;
+            info.ModelSerialCode = N2K_MODEL_SERIAL_CODE;
+            info.ProductCode = N2K_PRODUCT_CODE;
+            info.ModelID = N2K_MODEL_ID;
+            info.SwCode = N2K_SW_CODE;
+            info.ModelVersion = N2K_MODEL_VERSION;
+            info.UniqueNumber = N2K_UNIQUE_NUMBER;
+            info.DeviceFunction = N2K_DEVICEE_FUNCTION;
+            info.DeviceClass = N2K_DEVICE_CLASS;
+            info.ManufacturerCode = N2K_MANIFACTURER_CODE;
             n2k.setup(info);
         }
     }
 
+    void set_source(uint8_t s)
+    {
+        src = s;
+        n2k.set_desired_source(src);
+    }
+
     void send_N2K(double awd_deg, double aws_kn)
     {
-        if (N2K_ENABLED) // && wdata.error == WIND_ERROR_OK)
+        if (N2K_ENABLED)
         {
             tN2kMsg msg(n2k.get_source());
             SetN2kWindSpeed(msg, 0, KnotsToms(aws_kn), DegToRad(awd_deg), tN2kWindReference::N2kWind_Apparent);
@@ -56,10 +62,12 @@ public:
             if (no_stats)
             {
                 last_stats = s;
+                no_stats = false;
+                n2k_err = !n2k.is_bus_connected();
             }
             else
             {
-                n2k_err = (s.fail>last_stats.fail);
+                n2k_err = s.fail>last_stats.fail || !n2k.is_bus_connected();
             }
         }
     }

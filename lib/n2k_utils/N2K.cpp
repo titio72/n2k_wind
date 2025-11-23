@@ -20,21 +20,22 @@
 
 #include <time.h>
 #include <math.h>
+#include <string.h>
 #include "N2K.h"
 #include "Utils.h"
 #include "Log.h"
 
-#define PERIOD_N2K_MICROS 100000
+#define N2K_LOG_TAG "N2k"
 
-bool static_initialized = false;
-N2K *instance = NULL;
-N2KStats stats;
+static bool static_initialized = false;
+static N2K *instance = NULL;
+static N2KStats stats;
 
-void (*_handler)(const tN2kMsg &N2kMsg);
-void (*_source_handler)(const unsigned char old_source, const unsigned char new_source);
-void (*_on_sent_message)(const tN2kMsg &N2kMsg, bool success) = NULL;
+static n2k_msg_handler _handler = nullptr;
+static n2k_source_change_handler _source_handler = nullptr;
+static n2k_sent_message_handler _sent_message_handler = nullptr;
 
-N2K *N2K::get_instance(void (*_msg_handler)(const tN2kMsg &N2kMsg), void (*_src_handler)(const unsigned char old_s, const unsigned char new_s))
+N2K *N2K::get_instance(n2k_msg_handler _msg_handler, n2k_source_change_handler _src_handler)
 {
     if (instance == NULL)
     {
@@ -45,22 +46,19 @@ N2K *N2K::get_instance(void (*_msg_handler)(const tN2kMsg &N2kMsg), void (*_src_
     return instance;
 }
 
-void N2K::set_sent_message_callback(void (*_MsgHandler)(const tN2kMsg &N2kMsg, bool success))
+void N2K::set_sent_message_callback(n2k_sent_message_handler _MsgHandler)
 {
-    _on_sent_message = _MsgHandler;
+    _sent_message_handler = _MsgHandler;
 }
 
 N2K::N2K()
 {
-    desired_source = 22;
-    pgns = (unsigned long *)malloc(sizeof(unsigned long) * 1);
-    pgns[0] = 0;
-    n_pgns = 0;
+    desired_source = N2K_SOURCE_DEFAULT;
+    pgns.clear();
 }
 
 N2K::~N2K()
 {
-    free(pgns);
 }
 
 void private_message_handler(const tN2kMsg &N2kMsg)
@@ -71,10 +69,7 @@ void private_message_handler(const tN2kMsg &N2kMsg)
 
 unsigned char N2K::get_source()
 {
-    if (NMEA2000)
-        return NMEA2000->GetN2kSource();
-    else
-        return 0xfe;
+    return NMEA2000->GetN2kSource();
 }
 
 void N2K::set_desired_source(unsigned char src)
@@ -92,31 +87,30 @@ void N2K::loop(unsigned long time)
     if (is_initialized())
     {
         NMEA2000->ParseMessages();
-        static unsigned long t0 = time;
-        t0 = time;
+        stats.canbus = NMEA2000->IsOpen() ? 1 : 0;
         unsigned char s = NMEA2000->GetN2kSource();
         if (s != desired_source)
         {
             // claimed new source
-            Log::tracex("N2k", "Source claim", "old {%d} new {%d}", desired_source, s);
-            if (_source_handler) _source_handler(desired_source, s);
+            Log::tracex(N2K_LOG_TAG, "Source claim", "old {%d} new {%d}", desired_source, s);
+            unsigned char old_s = desired_source;
             desired_source = s;
+            if (_source_handler) _source_handler(old_s, s);
         }
     }
 }
 
 void N2K::set_can_socket_name(const char *name)
 {
-    strcpy(socket_name, name);
+    // bounded copy to avoid overflow
+    strncpy(socket_name, name, sizeof(socket_name) - 1);
+    socket_name[sizeof(socket_name) - 1] = '\0';
 }
 
 void N2K::add_pgn(unsigned long pgn)
 {
-    // pgns is an array terminated by a 0 (so we do not have to define the length)
-    pgns = (unsigned long *)realloc(pgns, sizeof(unsigned long) * (n_pgns + 2));
-    pgns[n_pgns] = pgn;
-    pgns[n_pgns + 1] = 0;
-    n_pgns++;
+    // Keep a simple vector of PGNs; we'll add a terminating 0 when passing to C API
+    pgns.push_back(pgn);
 }
 
 void N2K::setup(n2k_device_info dvc)
@@ -124,10 +118,10 @@ void N2K::setup(n2k_device_info dvc)
     if (!is_initialized())
     {
         #ifdef ESP32_ARCH
-        Log::tracex("N2k", "Initializing N2K", "RX {%d} TX {%d} source {%d}", ESP32_CAN_RX_PIN, ESP32_CAN_TX_PIN, desired_source);
+        Log::tracex(N2K_LOG_TAG, "Initializing N2K", "RX {%d} TX {%d} source {%d}", ESP32_CAN_RX_PIN, ESP32_CAN_TX_PIN, desired_source);
         NMEA2000 = new N2K_CLASS(ESP32_CAN_TX_PIN, ESP32_CAN_RX_PIN);
         #else
-        Log::trace("N2k", "Initializing N2K", "socket {%s}", socket_name);
+        Log::trace(N2K_LOG_TAG, "Initializing N2K", "socket {%s}", socket_name);
         NMEA2000 = new tNMEA2000_SocketCAN(socket_name);
         #endif
 
@@ -135,33 +129,39 @@ void N2K::setup(n2k_device_info dvc)
         NMEA2000->SetDeviceInformation(dvc.UniqueNumber, dvc.DeviceFunction, dvc.DeviceClass, dvc.ManufacturerCode);
         if (_handler)
         {
-            NMEA2000->SetMode(tNMEA2000::N2km_ListenAndNode, desired_source);
             NMEA2000->SetMsgHandler(private_message_handler);
         }
-        else
-        {
-            Log::trace("[N2K] Initializing node-only\n");
-            NMEA2000->SetMode(tNMEA2000::N2km_NodeOnly, desired_source);
-        }
+        NMEA2000->SetMode(tNMEA2000::N2km_NodeOnly, desired_source);
         NMEA2000->SetN2kCANSendFrameBufSize(1000);
         NMEA2000->EnableForward(false); // Disable all msg forwarding to USB (=Serial)
-        if (pgns) NMEA2000->ExtendTransmitMessages(pgns);
+        if (!pgns.empty()) {
+            // NMEA2000 expects an array terminated by 0 — create a temporary vector with a trailing 0
+            std::vector<unsigned long> ext = pgns;
+            ext.push_back(0);
+            NMEA2000->ExtendTransmitMessages(ext.data());
+        }
+        int retry = 0;
         do {
             static_initialized = NMEA2000->Open();
             if (!static_initialized)
             {
-                Log::trace("N2K", "Failed to open N2K bus, retrying...");
+                retry++;
+                Log::tracex(N2K_LOG_TAG, "Failed N2K init", "Retry {%d}", retry);
                 msleep(1000);
             }
-        } while (!static_initialized);
-        stats.canbus = static_initialized;
-        Log::tracex("N2K", "initialized", "success {%s}", is_initialized() ? "OK" : "KO");
+        } while (!static_initialized && retry < 5);
+        Log::tracex(N2K_LOG_TAG, "initialized", "success {%s}", is_initialized() ? "OK" : "KO");
     }
+}
+
+bool N2K::is_bus_connected()
+{
+    return NMEA2000->IsOpen();
 }
 
 bool N2K::send_msg(const tN2kMsg &N2kMsg)
 {
-    if (is_initialized())
+    if (is_bus_connected())
     {
         if (_handler)
         {
@@ -175,10 +175,10 @@ bool N2K::send_msg(const tN2kMsg &N2kMsg)
         }
         else
         {
-            //Log::tracex("N2K", "Failed message", "PGN {%d}", N2kMsg.PGN);
+            //Log::tracex(N2K_LOG_TAG, "Failed message", "PGN {%d}", N2kMsg.PGN);
             stats.fail++;
         }
-        if (_on_sent_message) _on_sent_message(N2kMsg, res);
+        if (_sent_message_handler) _sent_message_handler(N2kMsg, res);
         return res;
     }
     else
@@ -189,7 +189,7 @@ bool N2K::send_msg(const tN2kMsg &N2kMsg)
 
 void N2KStats::dump()
 {
-    Log::tracex("N2K", "Stats", "bus {%d} tx {%d/%d} rx {%d}", canbus, sent, fail, recv);
+    Log::tracex(N2K_LOG_TAG, "Stats", "bus {%d} tx {%d/%d} rx {%d}", canbus, sent, fail, recv);
 }
 
 void N2KStats::reset()

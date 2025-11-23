@@ -1,6 +1,8 @@
 #ifndef _LED_DRIVER_H
 #define _LED_DRIVER_H
 
+#include <Arduino.h>
+
 class LedDriver
 {
 public:
@@ -10,16 +12,13 @@ public:
     void setup();
     void loop(unsigned long time);
 
-    void set_blue(bool blue);
-    void set_error(int error);
-    void set_calibration(bool cal);
+    void set_bluetooth(bool blue);
+    void set_error(uint8_t error);
+    void set_running(bool normal);
 
 private:
     bool blue;
-    bool calib;
-    int error;
+    bool running;
+    uint8_t error;
 };
-
-
-
 #endif
