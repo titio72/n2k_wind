@@ -1,4 +1,6 @@
+#ifndef NATIVE
 #include <Arduino.h>
+#endif
 #include "WindSpeed.h"
 #include "WindUtil.h"
 #include "Utils.h"
@@ -56,17 +58,21 @@ void WindSpeed::apply_configuration(Conf& conf)
 }
 
 // the time is in micros! called from an ISR every 1ms
-void IRAM_ATTR WindSpeed::loop_micros(unsigned long t)
+void WindSpeed::loop_micros(unsigned long t)
 {
+  #ifndef NATIVE
   int new_state = digitalRead(SPEED_PIN);
   if (new_state!=state)
   {
     counter++;
     state = new_state;
   }
+  #endif
 }
 
 void WindSpeed::setup()
 {
+  #ifndef NATIVE
   pinMode(SPEED_PIN, INPUT);
+  #endif
 }

@@ -8,13 +8,14 @@ class LinuxPort: public Port
 
 public:
     LinuxPort(const char* port_pathd = "/dev/ttyUSB0");
+    ~LinuxPort();
     void set_port_name(const char* port_pathd);
 protected:
 
     virtual void _open();
     virtual void _close();
     virtual int _read(bool &nothing_to_read, bool &error);
-	virtual bool is_open();
+	virtual bool _is_open();
 
 private:
     int tty_fd;

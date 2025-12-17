@@ -2,14 +2,10 @@
 #define _BTINTERFACE_H
 
 #include <vector>
-#include <BLEUUID.h>
-#include <Arduino.h>
+#include <string>
+#include <stdint.h>
+#include <Utils.h>
 
-class BLEServer;
-class BLEService;
-class BLECharacteristic;
-class BLECharacteristicCallbacks;
-class BLEServerCallbacks;
 class Configuration;
 
 class ABBLEWriteCallback {
@@ -19,29 +15,41 @@ public:
 
 class ABBLESetting {
 public:
-    ABBLESetting(const char* n, const char* id): uuid(id)
-    {
-        strncpy(name, n, sizeof(name) - 1);
-    }
+    ABBLESetting(const char* n, const char* id): name(n), c_uuid(id) {}
 
-    char name[16];
-    BLEUUID uuid;
+    std::string name;
+    std::string c_uuid;
 };
 
 class ABBLEField {
 public:
-    ABBLEField(const char* n, const char* id): uuid(id)
-    {
-        strncpy(name, n, sizeof(name) - 1);
-    }
+    ABBLEField(const char* n, const char* id): name(n), c_uuid(id) {}
 
-    char name[16];
-    BLEUUID uuid;
+    std::string name;
+    std::string c_uuid;
 };
+
+class InternalBLEState
+{
+public:
+    virtual void init(const char* name, const char* uuid, ABBLEWriteCallback* c) = 0;
+    virtual void setup(const std::vector<ABBLEField> &fields, const std::vector<ABBLESetting> &settings) = 0;
+    virtual void begin() = 0;
+    virtual void change_device_name(const char *n) = 0;
+    virtual const char* get_device_name() = 0;
+    virtual void end() = 0;
+
+    virtual void set_field_value(int handle, const char *value) = 0;
+    virtual void set_field_value(int handle, uint16_t value) = 0;
+    virtual void set_field_value(int handle, void *value, int len) = 0;
+    virtual ByteBuffer get_field_value(int handle) = 0;
+    virtual void set_setting_value(int handle, const char *value) = 0;
+    virtual void set_setting_value(int handle, int value) = 0;
+ };
 
 class BTInterface {
     public:
-        BTInterface(const char* uuid, const char* device_name);
+        BTInterface(const char* uuid, const char* device_name, ABBLEWriteCallback* cmd_cback, InternalBLEState* internalState = nullptr);
         ~BTInterface();
         void setup();
         void begin();
@@ -55,26 +63,20 @@ class BTInterface {
         void set_field_value(int handle, uint16_t value);
         void set_field_value(int handle, const char* value);
         void set_field_value(int handle, void* value, int len);
-
-        void set_write_callback(ABBLEWriteCallback* cback) { callback = cback; }
+        ByteBuffer get_field_value(int handle);
 
         void set_device_name(const char* name);
+        const char* get_device_name();
 
     private:
-        char device_name[16];
-        BLEUUID serviceUUID;
-        BLEServer *pServer;
-        BLEService *pService;
-        BLECharacteristicCallbacks* listener;
-        BLEServerCallbacks* serverCBack;
-
-        ABBLEWriteCallback* callback;
+        bool internalStateOwned;
+        InternalBLEState* state;
+        ABBLEWriteCallback* writeCallback;
 
         std::vector<ABBLEField> fields;
         std::vector<ABBLESetting> settings;
-        std::vector<BLECharacteristic*> characteristicsSettings;
-        std::vector<BLECharacteristic*> characteristicsFields;
 
+        bool init;
 };
 
 #endif

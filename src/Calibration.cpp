@@ -3,7 +3,7 @@
 #include <Log.h>
 
 Calibration::Calibration(calibration_callback cback) 
-    : enabled(false), score_valid_threshold(0.8), off_calibration(false)
+    : enabled(false), score_valid_threshold(AUTO_CALIBRATION_SCORE_THRESHOLD_DEFAULT), off_calibration(false)
 {
     on_calibration_complete = cback;
     reset();

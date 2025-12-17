@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 #pragma region Range
-Range::Range() : l(RANGE_DEFAULT_MIN), h(RANGE_DEFAULT_MAX), minimum_valid_span(RANGE_DEFAULT_VALID) {} // init invalid
+Range::Range() : l(RANGE_DEFAULT_MIN), h(RANGE_DEFAULT_MAX), minimum_valid_span(RANGE_DEFAULT_VALID) {}
 
 Range::Range(uint16_t _low, uint16_t _high, uint16_t _valid_span) : l(_low), h(_high), minimum_valid_span(_valid_span) {}
 
@@ -72,10 +72,11 @@ double norm_deg(double d)
 
 int16_t norm_deg(int16_t d)
 {
+    d = d % 360;
     if (d < 0)
-        return (d % 360) + 360;
+        return d + 360;
     else
-        return d % 360;
+        return d;
 }
 
 char *mystrtok(char **m, char *s, char c)
@@ -94,7 +95,7 @@ char *mystrtok(char **m, char *s, char c)
 bool atoi_x(int32_t &value, const char *s_value)
 {
     int v = 0;
-    if (s_value)
+    if (s_value && s_value[0] != '\0')
     {
         int p = 1;
         for (int i = strlen(s_value) - 1; i >= 0; i--)
@@ -138,61 +139,4 @@ double lpf_angle(double previous, double current, double alpha)
     double diff = current - previous;
     if (diff > 180.0) diff -= 360.0; else if (diff < -180.0) diff += 360.0;
    return norm_deg(previous + alpha * diff);
-}
-
-/*
-int main(int arc, const char** argv) {
-    const char* _c = "123|234|345|456";
-    char* c = strdup(_c);
-
-    int32_t vv[] = {0,0,0,0};
-
-    char *t;
-    char* p = c;
-    int i_tok = 0;
-    for (t = mystrtok(&p, c, '|'); t && i_tok<4; t = mystrtok(&p, 0, '|'))
-    {
-        if (strlen(t))
-        {
-            parse_value(vv[i_tok], t, 4095);
-        }
-        i_tok++;
-    }
-    printf("%d %d %d %d\n", vv[0], vv[1], vv[2], vv[3]);
-
-   return 0;
-}
-*/
-
-ByteBuffer::ByteBuffer(size_t size) : buf_size(size), offset(0) {
-    buffer = new uint8_t[size];
-}
-
-ByteBuffer::~ByteBuffer()
-{
-    delete[] buffer;
-}
-
-ByteBuffer& ByteBuffer::operator<< (const Wind360 &w)
-{
-    *this << (uint8_t)w.size();
-    for (int i = 0; i < w.buffer_size(); i++) *this << (uint8_t)w.get_data(i);
-    *this << (uint8_t)round(w.get_score() * 100.0);
-    return *this;
-}
-
-ByteBuffer &ByteBuffer::operator<< (const char* t)
-{
-    size_t t_size = strlen(t);
-    if (t_size<255 && offset + t_size <= buf_size) {
-        *this << (uint8_t)t_size;
-        memcpy(buffer + offset, t, t_size);
-        offset += t_size;
-    }
-    return *this;
-}
-
-void ByteBuffer::reset()
-{
-    offset = 0;
 }

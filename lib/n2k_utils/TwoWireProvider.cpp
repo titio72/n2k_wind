@@ -1,4 +1,4 @@
-#ifdef ESP32_ARCH
+#ifndef NATIVE
 
 #include "TwoWireProvider.h"
 #include "Log.h"

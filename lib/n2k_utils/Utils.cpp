@@ -5,8 +5,10 @@
 #include <string.h>
 #include <cstdio>
 #include <unistd.h>
-#ifndef ESP32_ARCH
+#ifdef NATIVE
 #include <sys/sysinfo.h>
+#else
+#include <Arduino.h>
 #endif
 
 double lpf(double value, double previous_value, double alpha)
@@ -17,14 +19,13 @@ double lpf(double value, double previous_value, double alpha)
 unsigned long check_elapsed(ulong time, ulong &last_time, ulong period)
 {
   ulong dT = time - last_time;
-  if (dT>=period || dT<0)
+  if (dT>=period || dT<0 || last_time==0)
   {
     last_time = time;
     return dT;
   }
   return 0;
 }
-
 
 bool startswith(const char* str_to_find, const char* str)
 {
@@ -43,7 +44,7 @@ bool startswith(const char* str_to_find, const char* str)
 
 ulong _millis(void)
 {
-  #ifndef ESP32_ARCH
+  #ifdef NATIVE
   long            ms; // Milliseconds
   time_t          s;  // Seconds
   struct timespec spec;
@@ -65,7 +66,7 @@ ulong _millis(void)
 
 int msleep(long msec)
 {
-  #ifndef ESP32_ARCH
+    #ifdef NATIVE
     struct timespec ts;
     int res;
 
@@ -91,7 +92,7 @@ int msleep(long msec)
 
 unsigned long get_free_mem()
 {
-    #ifdef ESP32_ARCH
+    #ifndef NATIVE
     return ESP.getFreeHeap();
     #else
     struct sysinfo info;
@@ -133,7 +134,6 @@ int indexOf(const char* haystack, const char* needle)
   }
 }
 
-
 char * replace(char const * const original, char const * const pattern, char const * const replacement, bool first) {
   size_t const replen = strlen(replacement);
   size_t const patlen = strlen(pattern);
@@ -161,8 +161,12 @@ char * replace(char const * const original, char const * const pattern, char con
     // copy the original string,
     // replacing all the instances of the pattern
     char * retptr = returned;
-    for (oriptr = original; (patloc = strstr(oriptr, pattern)); oriptr = patloc + patlen)
+
+    oriptr = original;
+    for (int i = 0; i < patcnt; i++)
     {
+      patloc = strstr(oriptr, pattern);
+      
       size_t const skplen = patloc - oriptr;
       // copy the section until the occurence of the pattern
       strncpy(retptr, oriptr, skplen);
@@ -170,6 +174,9 @@ char * replace(char const * const original, char const * const pattern, char con
       // copy the replacement
       strncpy(retptr, replacement, replen);
       retptr += replen;
+
+      // adjust pointer in original string  
+      oriptr = patloc + patlen;
     }
     // copy the rest of the string.
     strcpy(retptr, oriptr);
@@ -178,13 +185,6 @@ char * replace(char const * const original, char const * const pattern, char con
   } else {
     return NULL;
   }
-}
-
-char *replace_and_free(char *orig, const char *pattern, const char *new_string, bool first)
-{
-    char *c = replace(orig, pattern, new_string, first);
-    free(orig);
-    return c;
 }
 
 // To store number of days in all months from January to Dec.
@@ -230,13 +230,6 @@ const char* time_to_ISO(time_t t, int millis)
   strftime(buf, sizeof "2011-10-08T07:07:09.000Z", "%FT%T", gmtime(&t));
   sprintf(buf + 19, ".%03dZ", millis);
   return buf;
-}
-
-bool array_contains(short test, short* int_set, int set_size) {
-    for (int i=0; i<set_size; i++) {
-        if (test==int_set[i]) return true;
-    }
-    return false;
 }
 
 N2KSid::N2KSid(): sid(0) {}

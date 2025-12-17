@@ -1,6 +1,5 @@
 #ifndef _CALIBRATION_H
 #define _CALIBRATION_H  
-#include <Arduino.h>
 #include "WindUtil.h"
 #include "Wind360.h"
 

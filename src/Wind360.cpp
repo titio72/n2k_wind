@@ -1,5 +1,4 @@
 #include <math.h>
-#include <cstring>
 #include "WindUtil.h"
 #include "Wind360.h"
 
@@ -35,18 +34,36 @@ Wind360::Wind360(int s): tot(0), n_samples(s)
     reset();
 }
 
+Wind360::Wind360(const Wind360 &w)
+{
+    tot = w.tot;
+    n_samples = w.n_samples;
+    sample_size = w.sample_size;
+    score = w.score;
+    tot_score = w.tot_score;
+
+    if (n_samples==0)
+    {
+        data = nullptr;
+        scores = nullptr;
+    }
+    else
+    {
+        data = new uint8_t[n_samples];
+        scores = new uint8_t[n_samples];
+        memcpy(data, w.data, n_samples * sizeof(uint8_t));
+        memcpy(scores, w.scores, n_samples * sizeof(uint8_t));
+    }
+}
+
 Wind360::~Wind360()
 {
-    if (n_samples==0) return;
-
-    delete data;
-    delete scores;
+    if (data) delete[] data;
+    if (scores) delete[] scores;
 }
 
 void Wind360::reset()
 {
-    if (n_samples==0) return;
-
     if (data) memset(data, 0, n_samples * sizeof(uint8_t));
     if (scores) memset(scores, 0, n_samples * sizeof(uint8_t));
     score = 0.0;
@@ -57,8 +74,7 @@ bool Wind360::set_degree(double v, double ellipse)
 {
     if (n_samples==0) return false;
 
-    v = norm_deg(v);
-    int16_t d = (int16_t)(v / sample_size + 0.5);
+    int16_t d = get_angle_bucket(v);
     if (data[d]==0)
     {
         data[d] = 1;
@@ -71,6 +87,14 @@ bool Wind360::set_degree(double v, double ellipse)
     {
         return false;
     }
+}
+
+int16_t Wind360::get_angle_bucket(double v) const
+{
+    if (n_samples==0) return -1;
+
+    v = norm_deg(v + sample_size / 2.0); // center the sample within the bucket
+    return (int16_t)(v / sample_size);
 }
 
 unsigned char Wind360::get_data(int ix) const

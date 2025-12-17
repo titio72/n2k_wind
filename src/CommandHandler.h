@@ -2,7 +2,7 @@
 #ifndef COMMAND_HANDLER_H
 #define COMMAND_HANDLER_H
 
-#include <Arduino.h>
+#include <stdint.h>
 
 enum class CommandResult : uint8_t
 {
@@ -18,18 +18,20 @@ enum class CommandResult : uint8_t
 
 class Calibration;
 class Conf;
-class BLEWind;
+class ConfPersistence;
+class IBLEWind;
 
 class CommandHandler
 {
 public:
-    CommandHandler(Conf &conf, Calibration &cal, BLEWind &ble);
+    CommandHandler(Conf &conf, ConfPersistence& confPersistence, Calibration &cal, IBLEWind &ble);
 
     CommandResult exec_command(const char *value);
     
 private:
+    ConfPersistence &confPersistence;
     Conf &conf;
-    Calibration &auto_calibration;
-    BLEWind &ble;
+    Calibration &calibration;
+    IBLEWind &ble;
 };
 #endif

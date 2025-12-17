@@ -1,8 +1,17 @@
 #ifndef _WIND_SPEED_H
 #define _WIND_SPEED_H
 
+#include <stdint.h>
+
 struct wind_data;
 class Conf;
+
+#ifndef LOW
+#define LOW 0
+#endif
+#ifndef HIGH
+#define HIGH 1
+#endif
 
 class WindSpeed
 {

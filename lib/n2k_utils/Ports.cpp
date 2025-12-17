@@ -1,7 +1,6 @@
 #include "Ports.h"
 #include "Log.h"
 #include "Utils.h"
-#include <Arduino.h>
 #include <string.h>
 
 Port::Port(const char *name): bytes(0), listener(NULL), pos(0), last_speed(DEFAULT_PORT_SPEED), speed(DEFAULT_PORT_SPEED), last_open_try(0)
@@ -54,11 +53,14 @@ int Port::process_char(char c)
 
 void Port::close()
 {
+	//Serial.println("Closing port");
 	_close();
 }
 
 int Port::open()
 {
+	//Serial.println("Opening port");
+	last_speed = speed;
 	_open();
 	return is_open();
 }
@@ -81,6 +83,7 @@ void Port::listen(uint ms)
 
 	if (!is_open())
 	{
+		//Serial.println("Port is closed");
 		return;
 	}
 
@@ -88,7 +91,7 @@ void Port::listen(uint ms)
 	{
 		bool error = false;
 		bool nothing_to_read = false;
-		int c = _read(nothing_to_read, error);
+		char c = (char)_read(nothing_to_read, error);
 		if (!nothing_to_read && !error)
 		{
 			bytes++;
@@ -101,7 +104,7 @@ void Port::listen(uint ms)
 		}
 		else
 		{
-			//Log::tracex("PORT", "Err reading", "port {%s} {%d} {%s}\n", port, errno, strerror(errno));
+			//Log::tracex("PORT", "Err reading", "{%d} {%s}\n", errno, strerror(errno));
 			close();
 			return;
 		}

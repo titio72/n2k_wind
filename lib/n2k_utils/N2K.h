@@ -4,6 +4,7 @@
 #include <N2kMessages.h>
 #include "Utils.h"
 #include <vector>
+#include <string>
 
 #ifndef N2K_SOURCE_DEFAULT
 #define N2K_SOURCE_DEFAULT  22
@@ -20,6 +21,7 @@ public:
     unsigned char canbus = 0;
     void dump();
     void reset();
+    void dump_and_reset();
 };
 
 struct n2k_device_info

@@ -1,4 +1,4 @@
-#ifndef ESP32_ARCH
+#ifdef NATIVE
 #include "Log.h"
 #include "Utils.h"
 #include "LinuxPort.h"
@@ -10,7 +10,7 @@
 #include <string.h>
 #include <errno.h>
 
-LinuxPort::LinuxPort(const char* p_name): tty_fd(0)
+LinuxPort::LinuxPort(const char* p_name): Port(p_name), tty_fd(0)
 {
 	// bounded copy
 	strncpy(port_name, p_name, sizeof(port_name) - 1);
@@ -57,10 +57,10 @@ void LinuxPort::_open()
 		tio.c_cc[VMIN] = 1;
 		tio.c_cc[VTIME] = 5;
 
-		Log::trace("[GPS] Opening port {%s} at {%d} BPS\n", port, speed);
+		Log::trace("[GPS] Opening port {%s} at {%d} BPS\n", port_name, speed);
 
-		tty_fd = ::open(port, O_RDONLY | O_NONBLOCK); // O_NONBLOCK might override VMIN and VTIME, so read() may return immediately.
-		Log::trace("Err opening port {%d} {%s} {%d} {%s}\n", tty_fd, port, errno, strerror(errno));
+		tty_fd = ::open(port_name, O_RDONLY | O_NONBLOCK); // O_NONBLOCK might override VMIN and VTIME, so read() may return immediately.
+		Log::trace("Err opening port {%d} {%s} {%d} {%s}\n", tty_fd, port_name, errno, strerror(errno));
 		if (tty_fd > 0)
 		{
 			speed_t bps;
@@ -76,13 +76,13 @@ void LinuxPort::_open()
 				bps = B38400;
 			}
 			fd_set_blocking(tty_fd, 0);
-			Log::trace("Err opening port {%s} {%d} {%s}\n", port, errno, strerror(errno));
+			Log::trace("Err opening port {%s} {%d} {%s}\n", port_name, errno, strerror(errno));
 			cfsetospeed(&tio, bps);
-			Log::trace("Err opening port {%s} {%d} {%s}\n", port, errno, strerror(errno));
+			Log::trace("Err opening port {%s} {%d} {%s}\n", port_name, errno, strerror(errno));
 			cfsetispeed(&tio, bps);
-			Log::trace("Err opening port {%s} {%d} {%s}\n", port, errno, strerror(errno));
+			Log::trace("Err opening port {%s} {%d} {%s}\n", port_name, errno, strerror(errno));
 			tcsetattr(tty_fd, TCSANOW, &tio);
-			Log::trace("Err opening port {%s} {%d} {%s}\n", port, errno, strerror(errno));
+			Log::trace("Err opening port {%s} {%d} {%s}\n", port_name, errno, strerror(errno));
 		}
 	}
 }
@@ -98,11 +98,11 @@ int LinuxPort::_read(bool &nothing, bool& error)
     unsigned char c;
     ssize_t bread = read(tty_fd, &c, 1);
     nothing = (errno==11);
-    error = errno!=11 && errno!=OK;
+    error = errno!=11 && errno!=0;
     return c;
 }
 
-bool LinuxPort::is_open()
+bool LinuxPort::_is_open()
 {
     return tty_fd;
 }

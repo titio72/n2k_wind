@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include <Log.h>
 #include "CommandHandler.h"
 #include "DataAndConf.h"
@@ -7,9 +6,15 @@
 
 struct CommandContext
 {
+    ConfPersistence &confPersistence;
     Conf &conf;
     Calibration &cal;
-    BLEWind &ble;
+    IBLEWind &ble;
+
+    bool write_conf()
+    {
+        return confPersistence.write(conf);
+    }
 };
 
 /*
@@ -42,7 +47,7 @@ CommandResult command_vane_type(CommandContext &ctx, const char* command_value)
     {
         Log::trace("[CMD] New vane type {%s}\n", vane==VANE_TYPE_ST50?"ST50":"ST60");
         ctx.conf.vane_type = vane;
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     Log::trace("[CMD] Invalid vane type\n");
     return CommandResult::INVALID_FORMAT;
@@ -57,12 +62,12 @@ CommandResult command_heartbeat(CommandContext &ctx, const char* command_value)
 CommandResult command_set_speed_adj(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CMD] Setting speed adjustment {%s}\n", command_value);
-    int32_t adj = 0;
+    int32_t adj = atoi(command_value);
     if (parse_value(adj, command_value, 255, 0))
     {
         Log::trace("[CMD] New speed adjustment {%d}\n", adj);
         ctx.conf.speed_adjustment = adj;
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     Log::trace("[CMD] Invalid speed adjustment\n");
     return CommandResult::INVALID_FORMAT;
@@ -76,7 +81,7 @@ CommandResult command_set_offset(CommandContext &ctx, const char *command_value)
     {
         Log::trace("[CMD] New offset {%d}\n", offset);
         ctx.conf.offset = offset;
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     Log::trace("[CMD] Invalid offset\n");
     return CommandResult::INVALID_FORMAT;
@@ -123,9 +128,8 @@ CommandResult command_finalize_calibration(CommandContext &ctx, const char *comm
 CommandResult command_factory_reset(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CMD] Reset calibration to default\n");
-    ctx.conf.offset = 0;
-    Range def_range;
-    return apply_calibration(def_range, def_range, ctx.cal.get_callback());
+    ctx.conf.reset();
+    return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }
 
 CommandResult command_abort_calibration(CommandContext &ctx, const char *command_value)
@@ -143,7 +147,7 @@ CommandResult command_set_speed_smoothing(CommandContext &ctx, const char *comma
     {
         ctx.conf.speed_smoothing = smoothing;
         Log::trace("[CAL] New speed smoothing {%d} alpha {%.2f}\n", smoothing, ctx.conf.get_speed_smoothing_factor());
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     Log::trace("[CAL] Invalid speed smoothing\n");
     return CommandResult::INVALID_FORMAT;
@@ -157,7 +161,7 @@ CommandResult command_set_angle_smoothing(CommandContext &ctx, const char *comma
     {
         ctx.conf.angle_smoothing = smoothing;
         Log::trace("[CAL] New angle smoothing {%d} alpha {%.2f}\n", smoothing, ctx.conf.get_angle_smoothing_factor());
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     Log::trace("[CAL] Invalid angle smoothing\n");
     return CommandResult::INVALID_FORMAT;
@@ -171,7 +175,7 @@ CommandResult command_set_auto_calibration_threshold(CommandContext &ctx, const 
     {
         ctx.conf.calibration_score_threshold = threshold;
         Log::trace("[CAL] New auto calibration threshold {%d} {%.2f}\n", threshold, ctx.conf.get_calibration_threshold_factor());
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     else
     {
@@ -194,7 +198,7 @@ CommandResult command_toggle_autocalib(CommandContext &ctx, const char *command_
         ctx.cal.reset();
         ctx.cal.enable(true);
     }
-    return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }
 
 CommandResult command_toggle_debug(CommandContext &ctx, const char *command_value)
@@ -213,19 +217,18 @@ CommandResult command_toggle_debug(CommandContext &ctx, const char *command_valu
             Log::disable();
         }
     }
-    return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
 }
 
 CommandResult command_change_ble_name(CommandContext &ctx, const char *command_value)
 {
     Log::trace("[CMD] Changing BLE name to {%s}\n", command_value);
-    if (command_value && strlen(command_value) < sizeof(ctx.conf.ble_name))
+    if (command_value && strlen(command_value) > 0 && strlen(command_value) < 15)
     {
-        strncpy(ctx.conf.ble_name, command_value, sizeof(ctx.conf.ble_name) - 1);
-        ctx.conf.ble_name[sizeof(ctx.conf.ble_name) - 1] = 0;
-        ctx.ble.set_device_name(ctx.conf.ble_name);
+        ctx.conf.set_ble_name(command_value);
+        ctx.ble.set_device_name(command_value);
         Log::trace("[CMD] New BLE name {%s}\n", ctx.conf.ble_name);
-        return ctx.conf.write() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
     }
     Log::trace("[CMD] Invalid BLE name\n");
     return CommandResult::INVALID_FORMAT;
@@ -233,7 +236,7 @@ CommandResult command_change_ble_name(CommandContext &ctx, const char *command_v
 
 #pragma endregion
 
-CommandHandler::CommandHandler(Conf &c, Calibration &cal, BLEWind &b) : conf(c), auto_calibration(cal), ble(b)
+CommandHandler::CommandHandler(Conf &c, ConfPersistence &confPersistence, Calibration &cal, IBLEWind &b) : conf(c), confPersistence(confPersistence), calibration(cal), ble(b)
 {
     memset(commands, 0, sizeof(commands));
     commands['K'] = command_set_speed_adj; // Set speed adj
@@ -261,7 +264,7 @@ CommandResult CommandHandler::exec_command(const char *value)
         if (cmd)
         {
             const char *command_value = (value + sizeof(char)); // skip the first char (which is the command code)
-            CommandContext ctx = {conf, auto_calibration, ble};
+            CommandContext ctx = {confPersistence, conf, calibration, ble};
             CommandResult res = cmd(ctx, command_value);
             return res;
         }

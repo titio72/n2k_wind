@@ -1,7 +1,6 @@
 #ifndef _WIND_SYSTEM_H
 #define _WIND_SYSTEM_H
 
-#include <Arduino.h>
 #include "LedDriver.h"
 
 struct wind_data;

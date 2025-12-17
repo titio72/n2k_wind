@@ -30,6 +30,8 @@ public:
 
 	void listen(unsigned int ms);
 	void close();
+	int open();
+	bool is_open() { return _is_open(); }
 
 	void set_handler(PortListener* listener);
 
@@ -43,14 +45,14 @@ protected:
 	virtual void _open() = 0;
 	virtual void _close() = 0;
 	virtual int _read(bool &nothing_to_read, bool &error) = 0;
-	virtual bool is_open() = 0;
+	virtual bool _is_open() = 0;
 
 	unsigned int speed;
 
 	char port_name[16];
 
 private:
-	int open();
+
 	int process_char(char c);
 
 	char read_buffer[PORT_BUFFER_SIZE];

@@ -4,7 +4,7 @@
  *  Created on: Mar 26, 2019
  *      Author: aboni
  */
-#ifdef ESP32_ARCH
+#ifndef NATIVE
 #include <Arduino.h>
 #endif
 
@@ -22,10 +22,10 @@ static char outbfr[MAX_TRACE_SIZE];
 
 inline bool can_trace()
 {
-#ifdef ESP32_ARCH
+#ifndef NATIVE
 	return enabled && Serial.availableForWrite();
 #else
-	return true;
+	return enabled;
 #endif
 }
 
@@ -42,7 +42,7 @@ const char *_gettime()
 
 void _trace(const char *text)
 {
-#ifdef ESP32_ARCH
+#ifndef NATIVE
 	Serial.print(text);
 #else
 	printf("%s", text);

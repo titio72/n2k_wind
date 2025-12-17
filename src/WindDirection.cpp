@@ -1,4 +1,6 @@
+#ifndef NATIVE
 #include <Arduino.h>
+#endif
 #include <math.h>
 #include "WindDirection.h"
 #include "WindUtil.h"
@@ -15,8 +17,9 @@ WindDirection::~WindDirection()
 {
 }
 
-void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s)
+void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s, uint16_t &n_samples)
 {
+    n_samples = std::min(SIN_COS_BUFFER_SIZE, n_samples + 1);
     uint16_t old = buf[ix];
     buf[ix] = v;
     s = s - old + v;
@@ -26,34 +29,48 @@ void inline buffer_it(uint16_t v, uint16_t *buf, uint16_t &ix, double &s)
 inline bool is_valid_reading(uint16_t reading)
 {
     // The typical range is between 1/4 and 3/4 of the totla range, hence a minimum of 1024. Below 600, is certainly a bad reading or a disconnected sensor.
-    return reading <= MAX_ADC_VALUE && reading>600; // expand in future...
+    return reading <= MAX_ADC_VALUE && reading>=600; // expand in future...
 }
 
-
-void IRAM_ATTR WindDirection::loop_micros(unsigned long now_micros) // this is called from an ISR every 1ms
+void WindDirection::loop_micros(unsigned long now_micros, uint16_t test_cos_reading, uint16_t test_sin_reading) // this is called from an ISR every 1ms
 {
+    if (test_sin_reading != UINT16_MAX && test_cos_reading != UINT16_MAX)
+    {
+        // test purposes
+        #ifdef SAMPLE_BUFFERING
+        buffer_it(test_sin_reading, sinBuffer, ix_buffer_sin, sumSin, n_samples_sin);
+        buffer_it(test_cos_reading, cosBuffer, ix_buffer_cos, sumCos, n_samples_cos);
+        #endif
+        return;
+    }
+
+    #ifndef NATIVE
     #ifdef SAMPLE_BUFFERING
     uint16_t i_sin = analogRead(SIN_PIN);
     uint16_t i_cos = analogRead(COS_PIN);
-    buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin);
-    buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos);
+    buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin, n_samples_sin);
+    buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos, n_samples_cos);
+    #endif
     #endif
 }
 
 void WindDirection::setup()
 {
+    #ifndef NATIVE
     // initilize ADC
     // set attenuation to read up to 2V (preferred range 150mV - 1750mV)
     // for Rayarine, the output is 2V-6V, hence we need a x3 divider, bringing the range to 667mv-2000mV
     analogSetPinAttenuation(SIN_PIN, adc_attenuation_t::ADC_11db);
     analogSetPinAttenuation(COS_PIN, adc_attenuation_t::ADC_11db);
+    #endif
 }
 
 void WindDirection::read_data(wind_data &wd, unsigned long milliseconds)
 {
     #ifdef SAMPLE_BUFFERING
-    wd.i_cos = (uint16_t)round(sumCos / SIN_COS_BUFFER_SIZE);
-    wd.i_sin = (uint16_t)round(sumSin / SIN_COS_BUFFER_SIZE);
+    if (n_samples_cos == 0) return; // no data yet
+    wd.i_cos = (uint16_t)round(sumCos / n_samples_cos);
+    wd.i_sin = (uint16_t)round(sumSin / n_samples_sin);
     #else
     wd.i_cos = analogRead(COS_PIN);
     wd.i_sin = analogRead(SIN_PIN);

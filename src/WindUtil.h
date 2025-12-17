@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <math.h>
+#include <Utils.h>
 #include "Constants.h"
 
 #define to_radians(angleInDegrees) ((angleInDegrees) * M_PI / 180.0)
@@ -55,44 +56,5 @@ bool parse_value(int32_t &target_value, const char *s_value, int32_t max_value, 
 double lpf_angle(double previous, double current, double alpha);
 
 void set_error(uint8_t& error, bool condition, uint8_t error_flag);
-
-class ByteBuffer
-{
-public:
-    ByteBuffer(size_t size);
-    ~ByteBuffer();
-
-    ByteBuffer &operator<< (const char* t);
-
-    template<typename T>
-    ByteBuffer &operator<< (T t)
-    {
-        size_t t_size = sizeof(T);
-        if (offset + t_size <= buf_size) {
-            *((T*)(buffer + offset)) = t;
-            offset += t_size;
-        }
-        return *this;
-    }
-    
-    ByteBuffer &operator<< (const Wind360 &w);
-
-    void reset();
-
-    void get_data(uint8_t* dest, size_t len) const
-    {
-        if (len > offset) len = offset;
-        memcpy(dest, buffer, len);
-    }
-
-    uint8_t* data() { return buffer; }
-    size_t size() const { return buf_size; }
-    size_t length() const { return offset; }
-
-private:
-    uint8_t *buffer;
-    size_t buf_size;
-    size_t offset;
-};
 
 #endif

@@ -1,3 +1,4 @@
+#ifndef NATIVE
 #include <Arduino.h>
 #include <math.h>
 #include <Log.h>
@@ -24,7 +25,8 @@ WindSpeed wind_speed;
 Calibration calibration(on_calibration_complete);
 BLEWind ble_wind(on_ble_command);
 N2KWind n2k_wind(on_n2k_source);
-CommandHandler cmd_handler(conf, calibration, ble_wind);
+ConfPersistence confPersistence; // default implementation
+CommandHandler cmd_handler(conf, confPersistence, calibration, ble_wind);
 #pragma endregion
 
 // ESP32 hw timer callback
@@ -34,13 +36,13 @@ inline void on_timer(unsigned long t_micros)
   wind_direction.loop_micros(t_micros);
 }
 
-void setup()
+void _setup()
 {
   Serial.begin(115200);
   msleep(1000);
 
   // read configuration from eeprom
-  conf.read();
+  confPersistence.read(conf);
   
   // initialize n2k
   n2k_wind.set_source(conf.n2k_source);
@@ -72,7 +74,7 @@ void update_led(const wind_data &wdata)
 
 void do_log(const wind_data &wdata, const Wind360 &cal_progr)
 {
-if (!Log::is_enabled()) return;
+  if (!Log::is_enabled()) return;
   
   Log::trace("[APP] Wind %s Sin/Cos {%d[%d..%d]/%d[%d..%d] %.1f} Dir {%5.1f[%5.1f]} Speed {%.1fKn/%.1fHz} Auto {%d} Err {%d %d}",
              wdata.conf.vane_type ? "ST60" : "ST50",
@@ -101,7 +103,7 @@ void on_n2k_source(unsigned char old_src, unsigned char new_src)
 {
   Log::trace("[N2K] Source changed from {%d} to {%d}\n", old_src, new_src);
   conf.n2k_source = new_src;
-  conf.write();
+  confPersistence.write(conf);
 }
 
 bool on_calibration_complete(const Range &s_range, const Range &c_range)
@@ -110,7 +112,7 @@ bool on_calibration_complete(const Range &s_range, const Range &c_range)
   {
     conf.sin_range.set(s_range);
     conf.cos_range.set(c_range);
-    if (conf.write())
+    if (confPersistence.write(conf))
     {
       Log::trace("[CAL] Calibration updated : sin {%d %d} cos {%d %d}\n",
                conf.sin_range.low(), conf.sin_range.high(),
@@ -124,7 +126,7 @@ bool on_calibration_complete(const Range &s_range, const Range &c_range)
   return false;
 }
 
-void loop()
+void _loop()
 {
   static wind_data wdata;
   unsigned long t_ms = millis();
@@ -172,3 +174,23 @@ void loop()
     do_log(wdata, calibration.get_wind360());
   }
 }
+
+#ifndef PIO_UNIT_TESTING
+void setup()
+{
+  _setup();
+}
+void loop()
+{
+  _loop();
+}
+#endif
+
+#else
+#ifndef PIO_UNIT_TESTING
+int main()
+{
+    return 0;
+}
+#endif
+#endif// NATIVE

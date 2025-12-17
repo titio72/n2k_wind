@@ -1,11 +1,11 @@
-#ifdef ESP32_ARCH
-#ifndef ESP32_CAN_TX_PIN
-#define ESP32_CAN_TX_PIN GPIO_NUM_4
+#ifndef NATIVE
+#ifndef CAN_TX_PIN
+#define CAN_TX_PIN GPIO_NUM_4
 #endif
-#ifndef ESP32_CAN_RX_PIN
-#define ESP32_CAN_RX_PIN GPIO_NUM_5
+#ifndef CAN_RX_PIN
+#define CAN_RX_PIN GPIO_NUM_5
 #endif
-#ifdef ESP32_C3
+#ifdef TWAI_CAN_DRIVER
 #define N2K_CLASS_NAME "esp32xx"
 #define N2K_CLASS tNMEA2000_esp32xx
 #include <NMEA2000_esp32xx.h>
@@ -14,8 +14,12 @@
 #define N2K_CLASS tNMEA2000_esp32
 #include <NMEA2000_esp32.h>
 #endif
-#else
+#else 
+#ifdef SOCKET_CAN
+#define N2K_CLASS_NAME "socket_can"
+#define N2K_CLASS tNMEA2000_SocketCAN
 #include <NMEA2000_SocketCAN.h>
+#endif
 #endif
 
 #include <time.h>
@@ -24,6 +28,7 @@
 #include "N2K.h"
 #include "Utils.h"
 #include "Log.h"
+#include <NMEA2000.h>
 
 #define N2K_LOG_TAG "N2k"
 
@@ -53,6 +58,7 @@ void N2K::set_sent_message_callback(n2k_sent_message_handler _MsgHandler)
 
 N2K::N2K()
 {
+    NMEA2000 = nullptr;
     desired_source = N2K_SOURCE_DEFAULT;
     pgns.clear();
 }
@@ -84,7 +90,7 @@ bool N2K::is_initialized()
 
 void N2K::loop(unsigned long time)
 {
-    if (is_initialized())
+    if (is_initialized() && NMEA2000)
     {
         NMEA2000->ParseMessages();
         stats.canbus = NMEA2000->IsOpen() ? 1 : 0;
@@ -113,55 +119,66 @@ void N2K::add_pgn(unsigned long pgn)
     pgns.push_back(pgn);
 }
 
+#ifndef NATIVE
+#define CREATE_NMEA \
+Log::tracex(N2K_LOG_TAG, "Initializing N2K", "RX {%d} TX {%d} source {%d}", CAN_RX_PIN, CAN_TX_PIN, desired_source); \
+NMEA2000 = new N2K_CLASS(CAN_TX_PIN, CAN_RX_PIN);
+#else
+#ifdef SOCKET_CAN
+#define CREATE_NMEA \
+Log::trace(N2K_LOG_TAG, "Initializing N2K", "socket {%s}", socket_name); \
+NMEA2000 = new tNMEA2000_SocketCAN(socket_name);
+#else
+#define CREATE_NMEA \
+NMEA2000 = nullptr;
+#endif
+#endif
+
 void N2K::setup(n2k_device_info dvc)
 {
     if (!is_initialized())
     {
-        #ifdef ESP32_ARCH
-        Log::tracex(N2K_LOG_TAG, "Initializing N2K", "RX {%d} TX {%d} source {%d}", ESP32_CAN_RX_PIN, ESP32_CAN_TX_PIN, desired_source);
-        NMEA2000 = new N2K_CLASS(ESP32_CAN_TX_PIN, ESP32_CAN_RX_PIN);
-        #else
-        Log::trace(N2K_LOG_TAG, "Initializing N2K", "socket {%s}", socket_name);
-        NMEA2000 = new tNMEA2000_SocketCAN(socket_name);
-        #endif
-
-        NMEA2000->SetProductInformation(dvc.ModelSerialCode.c_str(), dvc.ProductCode, dvc.ModelID.c_str(), dvc.SwCode.c_str(), dvc.ModelVersion.c_str());
-        NMEA2000->SetDeviceInformation(dvc.UniqueNumber, dvc.DeviceFunction, dvc.DeviceClass, dvc.ManufacturerCode);
-        if (_handler)
+        CREATE_NMEA
+        if (NMEA2000)
         {
-            NMEA2000->SetMsgHandler(private_message_handler);
-        }
-        NMEA2000->SetMode(tNMEA2000::N2km_NodeOnly, desired_source);
-        NMEA2000->SetN2kCANSendFrameBufSize(1000);
-        NMEA2000->EnableForward(false); // Disable all msg forwarding to USB (=Serial)
-        if (!pgns.empty()) {
-            // NMEA2000 expects an array terminated by 0 — create a temporary vector with a trailing 0
-            std::vector<unsigned long> ext = pgns;
-            ext.push_back(0);
-            NMEA2000->ExtendTransmitMessages(ext.data());
-        }
-        int retry = 0;
-        do {
-            static_initialized = NMEA2000->Open();
-            if (!static_initialized)
+            NMEA2000->SetProductInformation(dvc.ModelSerialCode.c_str(), dvc.ProductCode, dvc.ModelID.c_str(), dvc.SwCode.c_str(), dvc.ModelVersion.c_str());
+            NMEA2000->SetDeviceInformation(dvc.UniqueNumber, dvc.DeviceFunction, dvc.DeviceClass, dvc.ManufacturerCode);
+            if (_handler)
             {
-                retry++;
-                Log::tracex(N2K_LOG_TAG, "Failed N2K init", "Retry {%d}", retry);
-                msleep(1000);
+                NMEA2000->SetMsgHandler(private_message_handler);
             }
-        } while (!static_initialized && retry < 5);
-        Log::tracex(N2K_LOG_TAG, "initialized", "success {%s}", is_initialized() ? "OK" : "KO");
+            NMEA2000->SetMode(tNMEA2000::N2km_NodeOnly, desired_source);
+            NMEA2000->SetN2kCANSendFrameBufSize(1000);
+            NMEA2000->EnableForward(false); // Disable all msg forwarding to USB (=Serial)
+            if (!pgns.empty()) {
+                // NMEA2000 expects an array terminated by 0 — create a temporary vector with a trailing 0
+                std::vector<unsigned long> ext = pgns;
+                ext.push_back(0);
+                NMEA2000->ExtendTransmitMessages(ext.data());
+            }
+            int retry = 0;
+            do {
+                static_initialized = NMEA2000->Open();
+                if (!static_initialized)
+                {
+                    retry++;
+                    Log::tracex(N2K_LOG_TAG, "Failed N2K init", "Retry {%d}", retry);
+                    msleep(1000);
+                }
+            } while (!static_initialized && retry < 5);
+            Log::tracex(N2K_LOG_TAG, "initialized", "success {%s}", is_initialized() ? "OK" : "KO");
+        }
     }
 }
 
 bool N2K::is_bus_connected()
 {
-    return NMEA2000->IsOpen();
+    return NMEA2000 && NMEA2000->IsOpen();
 }
 
 bool N2K::send_msg(const tN2kMsg &N2kMsg)
 {
-    if (is_bus_connected())
+    if (is_bus_connected() && NMEA2000)
     {
         if (_handler)
         {
@@ -190,6 +207,12 @@ bool N2K::send_msg(const tN2kMsg &N2kMsg)
 void N2KStats::dump()
 {
     Log::tracex(N2K_LOG_TAG, "Stats", "bus {%d} tx {%d/%d} rx {%d}", canbus, sent, fail, recv);
+}
+
+void N2KStats::dump_and_reset()
+{
+    dump();
+    reset();
 }
 
 void N2KStats::reset()

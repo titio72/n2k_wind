@@ -1,8 +1,6 @@
 #include "Ports.h"
 #include "Log.h"
 #include <Arduino.h>
-#include <SoftwareSerial.h>
-#include <HardwareSerial.h>
 
 #define LOG_PORT_PREFIX "PORT"
 
@@ -19,7 +17,7 @@ protected:
     virtual void _open();
     virtual void _close();
     virtual int _read(bool &nothing_to_read, bool &error);
-	virtual bool is_open();
+	virtual bool _is_open();
 
 private:
     T& serial;
@@ -50,13 +48,6 @@ template <> void ArduinoPort<HardwareSerial>::_open()
     open = true;
 }
 
-template <> void ArduinoPort<SoftwareSerial>::_open()
-{
-    Log::tracex(LOG_PORT_PREFIX, "Open serial", "type {SW} name {%s} speed {%d BPS} RX {%d} TX {%d} invert {%d}", port_name, speed, rx_pin, tx_pin, invert);
-    serial.begin(speed, EspSoftwareSerial::SWSERIAL_8N1, rx_pin, tx_pin, invert);
-    open = true;
-}
-
 template <typename T> void ArduinoPort<T>::_close()
 {
     Log::tracex(LOG_PORT_PREFIX, "Close serial", "name {%s}", port_name);
@@ -78,7 +69,7 @@ template <typename T> int ArduinoPort<T>::_read(bool &nothing_to_read, bool &err
     }
 }
 
-template <typename T> bool ArduinoPort<T>::is_open()
+template <typename T> bool ArduinoPort<T>::_is_open()
 {
     return open;
 }

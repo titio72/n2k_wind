@@ -1,6 +1,7 @@
 #ifndef _CONF_H
 #define _CONF_H
-#include <Arduino.h>
+
+#include <stdint.h>
 #include "WindUtil.h"
 
 #define CONF_SERIAL 12
@@ -18,6 +19,10 @@ public:
 
   double get_speed_adjustement() const;
 
+  void set_ble_name(const char* name);
+
+  void reset();
+
   char serial;
   Range sin_range;
   Range cos_range;
@@ -31,9 +36,14 @@ public:
   uint8_t usb_tracing;
   uint8_t vane_type;
   char ble_name[16];
+};
 
-  bool write();
-  bool read();
+class ConfPersistence
+{
+public:
+    virtual ~ConfPersistence() {}
+    virtual bool write(Conf& conf);
+    virtual bool read(Conf& conf);
 };
 
 struct wind_data

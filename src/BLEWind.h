@@ -8,12 +8,19 @@ struct wind_data;
 
 typedef void (*on_command_callback)(const char *command);
 
-class BLEWind: ABBLEWriteCallback
+/* use for test purposes? */
+class IBLEWind
+{
+public:
+    virtual void set_device_name(const char* name) = 0;
+};
+
+class BLEWind: public IBLEWind, ABBLEWriteCallback
 {
 public:
     BLEWind(on_command_callback cback);
 
-   void on_write(int handle, const char* value);
+    void on_write(int handle, const char* value);
 
     void setup();
 

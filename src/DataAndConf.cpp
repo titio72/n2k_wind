@@ -1,23 +1,40 @@
-#include <Arduino.h>
-#include <Log.h>
+#ifdef PIO_UNIT_TESTING
+#include <MockEEPROM.h>
+#define EEE mockEEPROM
+#else
+#ifdef NATIVE
+#include <MockEEPROM.h>
+#define EEE mockEEPROM
+#else
 #include <EEPROM.h>
+#define EEE EEPROM
+#endif
+#endif
+#include <Log.h>
 #include "DataAndConf.h"
+#include "Constants.h"
 
-Conf::Conf() :
-        serial(CONF_SERIAL),
-        sin_range(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX, RANGE_DEFAULT_VALID), // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
-        cos_range(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX, RANGE_DEFAULT_VALID), // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
-        offset(0),
-        speed_smoothing(0), // 0..100 alpha value for LPF - 100 = no smoothing
-        angle_smoothing(0), // 0..100 alpha value for LPF - 100 = no smoothing
-        speed_adjustment(100), // 0..100 speed adjustment, multiplied by 100 to have 2 decimals
-        n2k_source(DEFAULT_N2K_SOURCE), // default source address
-        auto_cal(0), // auto calibration disabled by default
-        calibration_score_threshold(80), // a calibration is valid to be committed when the score is higher than...
-        usb_tracing(1),
-        vane_type(VANE_TYPE_DEFAULT)
+Conf::Conf()
 {
+  reset();
+}
+
+void Conf::reset()
+{
+  serial = CONF_SERIAL;
+  sin_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);  // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
+  cos_range.set(RANGE_DEFAULT_MIN, RANGE_DEFAULT_MAX);  // transducer voltage divided by 4 is 667/2000mV, so the lower bound is 1/3 of the range
+  offset = 0;
+  speed_smoothing = DEFAULT_WIND_SPEED_SMOOTHING; // 0..100 alpha value for LPF - 100 = no smoothing
+  angle_smoothing = DEFAULT_WIND_ANGLE_SMOOTHING; // 0..100 alpha value for LPF - 100 = no smoothing
+  speed_adjustment = 100;                         // 0..100 speed adjustment, multiplied by 100 to have 2 decimals  
+  n2k_source = DEFAULT_N2K_SOURCE;                // default source address
+  auto_cal = 0;                                   // auto calibration disabled by default
+  calibration_score_threshold = AUTO_CALIBRATION_SCORE_THRESHOLD_DEFAULT * 100; // a calibration is valid to be committed when the score is higher than...
+  usb_tracing = 1;
+  vane_type = VANE_TYPE_DEFAULT;                  // default vane type
   strncpy(ble_name, BLE_DEVICE_NAME, sizeof(ble_name) - 1);
+  ble_name[sizeof(ble_name) - 1] = 0;
 }
 
 double Conf::get_angle_smoothing_factor() const
@@ -40,41 +57,49 @@ double Conf::get_speed_adjustement() const
   return (double)speed_adjustment / 100.0;
 }
 
-bool Conf::write()
+void Conf::set_ble_name(const char *name)
 {
-  if (EEPROM.begin(sizeof(*this)))
+  if (name)
+    strncpy(ble_name, name, sizeof(ble_name) - 1);
+  ble_name[sizeof(ble_name) - 1] = 0;
+}
+
+bool ConfPersistence::write(Conf &conf)
+{
+  // Log::trace("[CONF] Writing configuration to EEPROM {%d}\n", sizeof(Conf));
+  if (EEE.begin(sizeof(Conf)))
   {
     Log::trace("[CONF] Writing configuration\n");
-    EEPROM.put(0, *this);
-    bool res = EEPROM.commit();
-    Log::trace("[CONF] Calibration written {%s}\n", res?"OK":"KO");
-    EEPROM.end();
+    EEE.put(0, conf);
+    bool res = EEE.commit();
+    Log::trace("[CONF] Calibration written {%s}\n", res ? "OK" : "KO");
+    EEE.end();
     return res;
   }
   else
   {
-      Log::trace("[CONF] Error writing configuration (EEPROM not initialized)\n");
-      return false;
+    Log::trace("[CONF] Error writing configuration (EEPROM not initialized)\n");
+    return false;
   }
 }
 
-bool Conf::read()
+bool ConfPersistence::read(Conf &conf)
 {
-  if (EEPROM.begin(sizeof(*this)))
+  if (EEE.begin(sizeof(Conf)))
   {
     bool read = false;
-    if (EEPROM.readChar(0) == CONF_SERIAL)
+    if (EEE.readChar(0) == CONF_SERIAL)
     {
-      EEPROM.get(0, *this);
+      EEE.get(0, conf);
       read = true;
       Log::trace("[CAL] Read configuration\n");
       // configuration is good
     }
-    EEPROM.end();
+    EEE.end();
     if (!read)
     {
       // conf in EEPROM is not good - wipe it out
-      return write();
+      return write(conf);
     }
     return true;
   }

@@ -13,6 +13,9 @@ const uint8_t WIND_ERROR_OFF_CALIBRATION = 0x02; // (bit #1)
 const uint8_t WIND_ERROR_NO_SIGNAL = 0x01; // (bit #0)
 const uint8_t WIND_ERROR_OK = 0x00;
 
+#define DEFAULT_WIND_SPEED_SMOOTHING 50 // %
+#define DEFAULT_WIND_ANGLE_SMOOTHING 50 // %
+
 #ifndef DEFAULT_N2K_SOURCE
 #define DEFAULT_N2K_SOURCE 21
 #endif
@@ -75,5 +78,8 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 
 #define AUTO_CALIB_THRESHOLD_MIN 50
 #define AUTO_CALIB_THRESHOLD_MAX 100
+#define AUTO_CALIBRATION_SCORE_THRESHOLD_DEFAULT 0.75 // default threshold to consider a calibration valid
 
+const uint8_t YES = 1;
+const uint8_t NO = 0;
 #endif
