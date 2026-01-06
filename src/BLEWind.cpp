@@ -1,4 +1,3 @@
-//#include <Arduino.h>
 #include <Log.h>
 #include "BLEWind.h"
 #include "WindUtil.h"
@@ -29,10 +28,13 @@ void BLEWind::setup()
     bt.begin();
 }
 
-void BLEWind::send_BLE(const wind_data& wdata, const Calibration &calib)
+void BLEWind::send_BLE(const configuration& conf, const all_data &wdata, const Calibration &calib)
 {
+    if (!alive)
+        return; // nobody is listening - save power
+
     buffer.reset();
-    make_message(wdata, calib, buffer);
+    make_message(conf, wdata, calib, buffer);
 
     if (buffer.length() > MAX_BLE_DATA_BUFFER_SIZE)
     {

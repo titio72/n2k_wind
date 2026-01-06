@@ -3,8 +3,9 @@
 
 class ByteBuffer;
 class Calibration;
-struct wind_data;
+struct all_data;
+struct configuration;
 
-ByteBuffer& make_message(const wind_data& wdata, const Calibration &calib, ByteBuffer& buffer);
+ByteBuffer& make_message(const configuration &conf, const all_data &wdata, const Calibration &calib, ByteBuffer& buffer);
 
 #endif

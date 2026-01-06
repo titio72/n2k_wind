@@ -38,20 +38,20 @@ class TestConfPersistence : public ConfPersistence
 public:
     TestConfPersistence() : ConfPersistence() {}
 
-    bool write(Conf &conf) override
+    bool write(configuration &conf) override
     {
         // In test, always succeed
         return true;
     }
 
-    bool read(Conf &conf) override
+    bool read(configuration &conf) override
     {
         return true;
     }
 };
 
 #define TEST_CONTEXT                     \
-    Conf conf;                           \
+    configuration conf;                           \
     TestConfPersistence confPersistence; \
     Calibration calib;                   \
     MockBLEWind ble;                     \

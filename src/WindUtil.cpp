@@ -61,24 +61,6 @@ void set_error(uint8_t& error, bool condition, uint8_t error_flag)
     }
 }
 
-double norm_deg(double d)
-{
-    d = d - (int)(d / 360) * 360;
-    if (d < 0)
-        return d + 360.0;
-    else
-        return d;
-}
-
-int16_t norm_deg(int16_t d)
-{
-    d = d % 360;
-    if (d < 0)
-        return d + 360;
-    else
-        return d;
-}
-
 char *mystrtok(char **m, char *s, char c)
 {
     char *p = s ? s : *m;

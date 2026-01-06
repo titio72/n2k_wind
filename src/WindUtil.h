@@ -43,10 +43,6 @@ private:
 
 typedef bool (*calibration_callback)(const Range &s_range, const Range &c_range);
 
-double norm_deg(double d);
-
-int16_t norm_deg(int16_t d);
-
 char *mystrtok(char **m, char *s, char c);
 
 bool atoi_x(int32_t &value, const char *s_value);

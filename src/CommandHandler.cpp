@@ -7,7 +7,7 @@
 struct CommandContext
 {
     ConfPersistence &confPersistence;
-    Conf &conf;
+    configuration &conf;
     Calibration &cal;
     IBLEWind &ble;
 
@@ -234,9 +234,56 @@ CommandResult command_change_ble_name(CommandContext &ctx, const char *command_v
     return CommandResult::INVALID_FORMAT;
 }
 
+CommandResult command_enable_stw(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CAL] Enable speed through water {%s}\n", ctx.conf.enable_stw ? "OFF" : "ON");
+    int32_t d = 0;
+    if (parse_value(d, command_value, 1, 0))
+    {
+        ctx.conf.enable_stw = d;
+        if (ctx.conf.enable_stw)
+        {
+            Log::enable();
+        }
+        else
+        {
+            Log::disable();
+        }
+    }
+    return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+}
+
+CommandResult command_set_stw_smoothing(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CAL] Setting stw smoothing {%s}\n", command_value);
+    int32_t smoothing = 0;
+    if (parse_value(smoothing, command_value, SMOOTHING_ALPHA_MAX, SMOOTHING_ALPHA_MIN))
+    {
+        ctx.conf.stw_smoothing = smoothing;
+        Log::trace("[CAL] New stw smoothing {%d} alpha {%.2f}\n", smoothing, ctx.conf.get_stw_smoothing_factor());
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    }
+    Log::trace("[CAL] Invalid stw smoothing\n");
+    return CommandResult::INVALID_FORMAT;
+}
+
+CommandResult command_set_stw_adj(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CMD] Setting stw adjustment {%s}\n", command_value);
+    int32_t adj = atoi(command_value);
+    if (parse_value(adj, command_value, 255, 0))
+    {
+        Log::trace("[CMD] New stw adjustment {%d}\n", adj);
+        ctx.conf.stw_adjustment = adj;
+        return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    }
+    Log::trace("[CMD] Invalid stw adjustment\n");
+    return CommandResult::INVALID_FORMAT;
+}
+
 #pragma endregion
 
-CommandHandler::CommandHandler(Conf &c, ConfPersistence &confPersistence, Calibration &cal, IBLEWind &b) : conf(c), confPersistence(confPersistence), calibration(cal), ble(b)
+CommandHandler::CommandHandler(configuration &c, ConfPersistence &confPersistence, Calibration &cal, IBLEWind &b) : conf(c), confPersistence(confPersistence), calibration(cal), ble(b)
 {
     memset(commands, 0, sizeof(commands));
     commands['K'] = command_set_speed_adj; // Set speed adj
@@ -253,6 +300,9 @@ CommandHandler::CommandHandler(Conf &c, ConfPersistence &confPersistence, Calibr
     commands['D'] = command_toggle_debug; // enable/disable USB tracing
     commands['V'] = command_vane_type; // send vane type (0=ST50, 1=ST60)
     commands['N'] = command_change_ble_name; // change BLE device name
+    commands['w'] = command_enable_stw; // enable/disable speed through water
+    commands['J'] = command_set_stw_smoothing; // change LPF alpha for the stw smoothing
+    commands['L'] = command_set_stw_adj; // Set speed through water adj
 }
 
 CommandResult CommandHandler::exec_command(const char *value)

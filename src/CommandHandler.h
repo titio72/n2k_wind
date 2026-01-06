@@ -17,20 +17,20 @@ enum class CommandResult : uint8_t
 };
 
 class Calibration;
-class Conf;
+struct configuration;
 class ConfPersistence;
 class IBLEWind;
 
 class CommandHandler
 {
 public:
-    CommandHandler(Conf &conf, ConfPersistence& confPersistence, Calibration &cal, IBLEWind &ble);
+    CommandHandler(configuration &conf, ConfPersistence& confPersistence, Calibration &cal, IBLEWind &ble);
 
     CommandResult exec_command(const char *value);
     
 private:
     ConfPersistence &confPersistence;
-    Conf &conf;
+    configuration &conf;
     Calibration &calibration;
     IBLEWind &ble;
 };

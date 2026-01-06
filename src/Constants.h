@@ -13,8 +13,16 @@ const uint8_t WIND_ERROR_OFF_CALIBRATION = 0x02; // (bit #1)
 const uint8_t WIND_ERROR_NO_SIGNAL = 0x01; // (bit #0)
 const uint8_t WIND_ERROR_OK = 0x00;
 
+const uint8_t STW_ERROR_NO_SIGNAL = 0x01; // (bit #0)
+const uint8_t STW_ERROR_OK = 0x00;
+
+const uint8_t TEMP_ERROR_NO_SIGNAL = 0x01; // (bit #0)
+const uint8_t TEMP_ERROR_OK = 0x00;
+
 #define DEFAULT_WIND_SPEED_SMOOTHING 50 // %
 #define DEFAULT_WIND_ANGLE_SMOOTHING 50 // %
+#define DEFAULT_STW_SMOOTHING 50 // %
+#define DEFAULT_TEMP_SMOOTHING 50 // %
 
 #ifndef DEFAULT_N2K_SOURCE
 #define DEFAULT_N2K_SOURCE 21
@@ -45,15 +53,16 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 
 #define VANE_TYPE_DEFAULT VANE_TYPE_ST50 // ST50
 
-#define HZ_TO_KNOTS_ST50 0.672 // use 0.672 for ST50
+#define HZ_TO_KNOTS_ST50 0.700 // use 0.673 ~ 0.700 for ST50
 #define HZ_TO_KNOTS_ST60 1.000 // use 1.000 for ST60
 
 // Sin and Cos are calculated as moving average over N samples
 #define SIN_COS_BUFFER_SIZE 200 // about 0.2s averaging at 1ms rate 
 
 // main loop
-#define MAIN_LOOP_PERIOD_LOW_FREQ 200L // (millis) regulates the main loop used to read sensors and interacts with N2K & BLE
+#define MAIN_LOOP_PERIOD_LOW_FREQ 250L // (millis) regulates the main loop used to read sensors and interacts with N2K & BLE
 #define WIND_N2K_DATA_FREQ 500L // (millis) regulates how frequently send out wind info on the N2K bus
+#define STW_N2K_DATA_FREQ 1000L // (millis) regulates how frequently send out speed through water info on the N2K bus
 #define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 10000L // (millis) do not take samples for 10 seconds after restart (sample would be funny)
 #define CPU_FREQUENCY 80 // MHz (ESP32 default is 160). 80 is the lower value that makes the device operable
 

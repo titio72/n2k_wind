@@ -4,7 +4,8 @@
 #include "WindUtil.h"
 
 class Calibration;
-struct wind_data;
+struct all_data;
+struct configuration;
 
 typedef void (*on_command_callback)(const char *command);
 
@@ -24,7 +25,7 @@ public:
 
     void setup();
 
-    void send_BLE(const wind_data& wdata, const Calibration &calib);
+    void send_BLE(const configuration& conf, const all_data& wdata, const Calibration &calib);
 
     void loop(unsigned long milli_seconds);
 

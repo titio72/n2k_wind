@@ -6,10 +6,18 @@
 
 #define CONF_SERIAL 12
 
-class Conf
+struct configuration
 {
 public:
-  Conf();
+  configuration();
+
+  double get_stw_smoothing_factor() const;
+
+  double get_temp_smoothing_factor() const;
+
+  double get_stw_adjustement() const;
+
+  double get_temp_adjustment() const;
 
   double get_angle_smoothing_factor() const;
 
@@ -19,7 +27,7 @@ public:
 
   double get_speed_adjustement() const;
 
-  void set_ble_name(const char* name);
+  void set_ble_name(const char *name);
 
   void reset();
 
@@ -35,41 +43,50 @@ public:
   uint8_t calibration_score_threshold;
   uint8_t usb_tracing;
   uint8_t vane_type;
+  uint8_t stw_smoothing;
+  uint8_t stw_adjustment;
+  uint8_t temp_smoothing;
+  uint8_t temp_adjustment;
+  uint8_t enable_stw;
+  uint8_t enable_temp;
   char ble_name[16];
 };
 
 class ConfPersistence
 {
 public:
-    virtual ~ConfPersistence() {}
-    virtual bool write(Conf& conf);
-    virtual bool read(Conf& conf);
+  virtual ~ConfPersistence() {}
+  virtual bool write(configuration &conf);
+  virtual bool read(configuration &conf);
 };
 
 struct wind_data
 {
-    // angle data
-    double angle = 0.0;
-    double smooth_angle = 0.0;
-    double ellipse = 1.0;
-    uint8_t angle_error = WIND_ERROR_NO_SIGNAL;
-    uint16_t i_sin = 0;
-    uint16_t i_cos = 0;
+  // angle data
+  double angle = 0.0;
+  double smooth_angle = 0.0;
+  double ellipse = 1.0;
+  uint8_t angle_error = WIND_ERROR_NO_SIGNAL;
+  uint16_t i_sin = 0;
+  uint16_t i_cos = 0;
 
-    // speed data
-    double speed = 0.0;
-    double frequency = 0.0;
-    uint8_t speed_error = WIND_ERROR_NO_SIGNAL;
+  // speed data
+  double speed = 0.0;
+  double frequency = 0.0;
+  uint8_t speed_error = WIND_ERROR_NO_SIGNAL;
+};
 
-    // system data
-    uint8_t n2k_err = 1;
-    unsigned long heap = 0;
+struct all_data
+{
+  // system data
+  uint8_t n2k_err = 1;
+  unsigned long heap = 0;
 
-    Conf conf;
+  wind_data wind;
 
-    double get_out_angle() const
-    {
-      return norm_deg(smooth_angle + conf.offset);
-    }
+  double get_out_angle(const configuration &conf) const
+  {
+    return norm_deg(wind.smooth_angle + conf.offset);
+  }
 };
 #endif

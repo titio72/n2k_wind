@@ -67,7 +67,7 @@ bool is_off(const Range &current, const Range &candidate)
     return false;
 }
 
-void Calibration::apply_configuration(Conf &conf)
+void Calibration::apply_configuration(configuration &conf)
 {
     set_score_valid_threshold(conf.get_calibration_threshold_factor());
     enable(conf.auto_cal==1);

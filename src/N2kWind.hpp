@@ -44,10 +44,20 @@ public:
 
     void send_N2K(double awd_deg, double aws_kn)
     {
-        if (N2K_ENABLED)
+        if (N2K_ENABLED && isnan(awd_deg) == false && isnan(aws_kn) == false)
         {
             tN2kMsg msg(n2k.get_source());
             SetN2kWindSpeed(msg, 0, KnotsToms(aws_kn), DegToRad(awd_deg), tN2kWindReference::N2kWind_Apparent);
+            n2k.send_msg(msg);
+        }
+    }
+
+    void send_stw(double stw_kn)
+    {
+        if (N2K_ENABLED && isnan(stw_kn) == false)
+        {
+            tN2kMsg msg(n2k.get_source());
+            SetN2kPGN128259(msg, 0, KnotsToms(stw_kn));
             n2k.send_msg(msg);
         }
     }
@@ -59,16 +69,10 @@ public:
             n2k.loop(milliseconds);
 
             N2KStats s = n2k.getStats();
-            if (no_stats)
-            {
-                last_stats = s;
-                no_stats = false;
-                n2k_err = !n2k.is_bus_connected();
-            }
-            else
-            {
-                n2k_err = s.fail>last_stats.fail || !n2k.is_bus_connected();
-            }
+
+            last_stats = s;
+            no_stats = false;
+            n2k_err = !n2k.is_bus_connected();
         }
     }
 

@@ -3,7 +3,7 @@
 #include "WindUtil.h"
 #include "Wind360.h"
 
-class Conf;
+struct configuration;
 
 class Calibration
 {
@@ -29,7 +29,7 @@ public:
 
     bool is_off_calibration() const;
 
-    void apply_configuration(Conf &conf);
+    void apply_configuration(configuration &conf);
 
     void apply_calibration();
 

@@ -3,8 +3,6 @@
 
 #include "LedDriver.h"
 
-struct wind_data;
-
 class WindSystem
 {
 public:

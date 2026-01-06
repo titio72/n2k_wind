@@ -6,20 +6,22 @@
 class WindDirection
 {
 public:
-    WindDirection();
+    WindDirection(int cosPin, int sinPin);
     ~WindDirection();
 
     void setup();
 
-    void read_data(wind_data& wd, unsigned long milliseconds);
+    void read_data(wind_data& wd, configuration &conf, unsigned long milliseconds);
 
     void loop_micros(unsigned long now_micros, uint16_t test_cos_reading = UINT16_MAX, uint16_t test_sin_reading = UINT16_MAX);
 
     unsigned long get_sample_age() const { return last_read_time; }
 
-    void apply_configuration(Conf &conf);
+    void apply_configuration(configuration &conf);
 
 private:
+    int sinPin;
+    int cosPin;
     uint16_t sinBuffer[SIN_COS_BUFFER_SIZE];
     uint16_t cosBuffer[SIN_COS_BUFFER_SIZE];
     uint16_t n_samples_cos = 0;

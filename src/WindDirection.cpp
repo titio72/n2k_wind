@@ -7,7 +7,7 @@
 
 #define SAMPLE_BUFFERING
 
-WindDirection::WindDirection() : ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
+WindDirection::WindDirection(int cosPin, int sinPin) : cosPin(cosPin), sinPin(sinPin), ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0)
 {
     memset(sinBuffer, 0, sizeof(uint16_t) * SIN_COS_BUFFER_SIZE);
     memset(cosBuffer, 0, sizeof(uint16_t) * SIN_COS_BUFFER_SIZE);
@@ -46,8 +46,8 @@ void WindDirection::loop_micros(unsigned long now_micros, uint16_t test_cos_read
 
     #ifndef NATIVE
     #ifdef SAMPLE_BUFFERING
-    uint16_t i_sin = analogRead(SIN_PIN);
-    uint16_t i_cos = analogRead(COS_PIN);
+    uint16_t i_sin = analogRead(sinPin);
+    uint16_t i_cos = analogRead(cosPin);
     buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin, n_samples_sin);
     buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos, n_samples_cos);
     #endif
@@ -65,7 +65,7 @@ void WindDirection::setup()
     #endif
 }
 
-void WindDirection::read_data(wind_data &wd, unsigned long milliseconds)
+void WindDirection::read_data(wind_data &wd, configuration &conf, unsigned long milliseconds)
 {
     #ifdef SAMPLE_BUFFERING
     if (n_samples_cos == 0) return; // no data yet
@@ -88,13 +88,13 @@ void WindDirection::read_data(wind_data &wd, unsigned long milliseconds)
         double v_cos = cos_calib_range.to_analog(-1, 1, wd.i_cos);
         wd.ellipse = sqrt(v_sin * v_sin + v_cos * v_cos);
         wd.angle = norm_deg(to_degrees(atan2(v_sin, v_cos)));
-        wd.smooth_angle = lpf_angle(wd.smooth_angle, wd.angle, wd.conf.get_angle_smoothing_factor());
+        wd.smooth_angle = lpf_angle(wd.smooth_angle, wd.angle, conf.get_angle_smoothing_factor());
         set_error(wd.angle_error, false, WIND_ERROR_NO_SIGNAL);
     }
     last_read_time = milliseconds;
 }
 
-void WindDirection::apply_configuration(Conf &conf)
+void WindDirection::apply_configuration(configuration &conf)
 {
     sin_calib_range = conf.sin_range;
     cos_calib_range = conf.cos_range;
