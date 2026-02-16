@@ -65,6 +65,7 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #define STW_N2K_DATA_FREQ 1000L // (millis) regulates how frequently send out speed through water info on the N2K bus
 #define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 10000L // (millis) do not take samples for 10 seconds after restart (sample would be funny)
 #define CPU_FREQUENCY 80 // MHz (ESP32 default is 160). 80 is the lower value that makes the device operable
+#define SPEED_SENSING_PERIOD_MULTIPLIER 4 // The frequency is collected every N main loops to reduce noise (1 means every loop, 2 every two loops, etc...)
 
 // BLE
 #define BLE_DEVICE_UUID "32890585-c6ee-498b-9e7a-044baefb6542"

@@ -29,6 +29,8 @@ private:
 
     double adjustment_factor = 1.0;
     uint8_t vane_type;
+
+    unsigned long last_valid_reat_ts = 0;
 };
 
 #endif

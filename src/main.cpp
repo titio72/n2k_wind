@@ -134,7 +134,7 @@ void _loop()
   unsigned long t_ms = millis();
   static unsigned long t0 = t_ms;
   static unsigned long wind_n2k_t0 = t_ms;
-  bool x = true;
+  static int x = 0;
   if (check_elapsed(t_ms, t0, MAIN_LOOP_PERIOD_LOW_FREQ))
   {
     current_data.heap = get_free_mem();
@@ -146,8 +146,8 @@ void _loop()
     
     // read data
     wind_direction.read_data(current_data.wind, conf,  t_ms);
-    if (x) wind_speed.read_data(current_data.wind, conf, t_ms);
-    x = !x;
+    if (x==0) wind_speed.read_data(current_data.wind, conf, t_ms);
+    x = (x + 1) % SPEED_SENSING_PERIOD_MULTIPLIER; // read speed every 4 loops to reduce noise
     
     // manage calibration
     if (t_ms > CALIBRATION_SAMPLING_EXCLUSION_PERIOD) // do not sample for X seconds after restart

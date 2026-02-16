@@ -72,7 +72,7 @@ public:
 
             last_stats = s;
             no_stats = false;
-            n2k_err = !n2k.is_bus_connected();
+            n2k_err = s.fail>0; //!n2k.is_bus_connected();
         }
     }
 
