@@ -44,8 +44,10 @@ public:
         return true;
     }
 
-    bool read(configuration &conf) override
+    bool read(configuration &conf, int *error_code) override
     {
+        if (error_code)
+            *error_code = 0; // indicate success
         return true;
     }
 };

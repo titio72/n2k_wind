@@ -43,7 +43,7 @@ void _setup()
 
   // read configuration from eeprom
   confPersistence.read(conf);
-  WindSystem::enable_usb_tracing(conf.usb_tracing);
+  WindSystem::enable_usb_tracing(true);
 
   // initialize wind measurement
   wind_speed.setup();

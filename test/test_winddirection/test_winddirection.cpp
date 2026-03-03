@@ -21,11 +21,6 @@ static configuration create_default_config(void) {
     conf.n2k_source = 21;
     conf.vane_type = VANE_TYPE_ST50;
     conf.usb_tracing = 0;
-    conf.stw_smoothing = 50;
-    conf.stw_adjustment = 0;
-    conf.temp_smoothing = 50;
-    conf.enable_stw = 0;
-    conf.enable_temp = 0;
     return conf;
 }
 

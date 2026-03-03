@@ -18,7 +18,7 @@ Transducer Compatibility: If a newer ST60 masthead transducer (which has an egg-
 Correction: The only intended method to correct this is to use the correct type of masthead unit for the display or to use an ST60+ display and set its calibration factor to 0.7 to match the older ST50 transducer's output.
 */
 
-static const bool USE_SPEED_SENSOR_INTERRUPT = false; // set to true to use SpeedSensorInterrupt instead of SpeedSensor
+static const bool USE_SPEED_SENSOR_INTERRUPT = true; // set to true to use SpeedSensorInterrupt instead of SpeedSensor
 
 WindSpeed::WindSpeed(int pin) : vane_type(VANE_TYPE_DEFAULT), speed_sensor(pin), speed_sensor_interrupt(pin)
 {
@@ -43,7 +43,7 @@ void WindSpeed::read_data(wind_data &data, configuration &conf, unsigned long mi
     {
       last_valid_reat_ts = milliseconds;
       data.frequency = frequency;
-      data.speed = frequency * adjustment_factor * ((vane_type == VANE_TYPE_ST60) ? HZ_TO_KNOTS_ST60 : HZ_TO_KNOTS_ST50) * 0.5;
+      data.speed = frequency * adjustment_factor * ((vane_type == VANE_TYPE_ST60) ? HZ_TO_KNOTS_ST60 : HZ_TO_KNOTS_ST50);
       data.speed_error = WIND_ERROR_OK;
       //Log::tracex("WIND", "SpeedSensor", "Read speed sensor: counter {%d} frequency {%.2f}Hz speed {%.2f}knots", counter, frequency, data.speed);
     }

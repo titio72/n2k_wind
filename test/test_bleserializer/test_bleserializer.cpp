@@ -59,11 +59,6 @@ static configuration create_default_config(void) {
     conf.n2k_source = 21;
     conf.sin_range.set(600, 3400);
     conf.cos_range.set(600, 3400);
-    conf.stw_smoothing = 50;
-    conf.stw_adjustment = 0;
-    conf.temp_smoothing = 50;
-    conf.enable_stw = 0;
-    conf.enable_temp = 0;
     conf.set_ble_name("ABWind");
     return conf;
 }
@@ -80,10 +75,6 @@ static all_data create_default_data(void) {
     data.wind.speed_error = 0;
     data.wind.i_sin = 2000;
     data.wind.i_cos = 2000;
-    data.water.speed = 0.0;
-    data.water.temperature = 0.0;
-    data.water.speed_error = STW_ERROR_NO_SIGNAL;
-    data.water.temperature_error = TEMP_ERROR_NO_SIGNAL;
     return data;
 }
 
@@ -421,47 +412,6 @@ void test_make_message_config_fields(void) {
     TEST_ASSERT_NOT_EQUAL(0, buf.size());
 }
 
-// ============================================================================
-// Water Data Tests
-// ============================================================================
-
-/**
- * Test: make_message includes water speed data
- */
-void test_make_message_water_speed(void) {
-    configuration conf = create_default_config();
-    conf.enable_stw = 1;
-    
-    all_data data = create_default_data();
-    data.water.speed = 8.5;
-    data.water.speed_error = STW_ERROR_OK;
-    
-    Calibration calib;
-    ByteBuffer buf(256);
-    make_message(conf, data, calib, buf);
-    
-    // Should not crash and produce valid buffer
-    TEST_ASSERT_TRUE(buf.size() > 0);
-}
-
-/**
- * Test: make_message includes water temperature data
- */
-void test_make_message_water_temp(void) {
-    configuration conf = create_default_config();
-    conf.enable_temp = 1;
-    
-    all_data data = create_default_data();
-    data.water.temperature = 15.5;
-    data.water.temperature_error = TEMP_ERROR_OK;
-    
-    Calibration calib;
-    ByteBuffer buf(256);
-    make_message(conf, data, calib, buf);
-    
-    // Should not crash and produce valid buffer
-    TEST_ASSERT_TRUE(buf.size() > 0);
-}
 
 // ============================================================================
 // Integration Tests
@@ -500,11 +450,6 @@ void test_make_message_full_data(void) {
     conf.auto_cal = 1;
     conf.speed_adjustment = 5;
     conf.vane_type = VANE_TYPE_ST60;
-    conf.enable_stw = 1;
-    conf.enable_temp = 1;
-    conf.stw_smoothing = 65;
-    conf.stw_adjustment = 3;
-    conf.temp_smoothing = 55;
     
     all_data data = create_default_data();
     data.wind.angle = 123.45;
@@ -515,36 +460,12 @@ void test_make_message_full_data(void) {
     data.wind.angle_error = WIND_ERROR_NO_SIGNAL;
     data.wind.i_sin = 2500;
     data.wind.i_cos = 2800;
-    data.water.speed = 8.5;
-    data.water.temperature = 15.5;
-    data.water.speed_error = STW_ERROR_OK;
-    data.water.temperature_error = TEMP_ERROR_OK;
     
     Calibration calib;
     ByteBuffer buf(256);
     make_message(conf, data, calib, buf);
     
     // Should not crash and produce valid buffer
-    TEST_ASSERT_TRUE(buf.size() > 0);
-}
-
-/**
- * Test: make_message with disabled water data
- */
-void test_make_message_water_disabled(void) {
-    configuration conf = create_default_config();
-    conf.enable_stw = 0;
-    conf.enable_temp = 0;
-    
-    all_data data = create_default_data();
-    data.water.speed = 8.5;
-    data.water.temperature = 15.5;
-    
-    Calibration calib;
-    ByteBuffer buf(256);
-    make_message(conf, data, calib, buf);
-    
-    // Should serialize without water data
     TEST_ASSERT_TRUE(buf.size() > 0);
 }
 
@@ -596,14 +517,9 @@ int main(int argc, char **argv) {
     // ========== Configuration Fields Tests ==========
     RUN_TEST(test_make_message_config_fields);
     
-    // ========== Water Data Tests ==========
-    RUN_TEST(test_make_message_water_speed);
-    RUN_TEST(test_make_message_water_temp);
-    
     // ========== Integration Tests ==========
     RUN_TEST(test_make_message_buffer_size);
     RUN_TEST(test_make_message_full_data);
-    RUN_TEST(test_make_message_water_disabled);
     
     return UNITY_END();
 }
