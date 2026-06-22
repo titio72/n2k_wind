@@ -18,9 +18,11 @@ Transducer Compatibility: If a newer ST60 masthead transducer (which has an egg-
 Correction: The only intended method to correct this is to use the correct type of masthead unit for the display or to use an ST60+ display and set its calibration factor to 0.7 to match the older ST50 transducer's output.
 */
 
-static const bool USE_SPEED_SENSOR_INTERRUPT = true; // set to true to use SpeedSensorInterrupt instead of SpeedSensor
+#ifndef USE_SPEED_SENSOR_INTERRUPT
+#define USE_SPEED_SENSOR_INTERRUPT 0
+#endif
 
-WindSpeed::WindSpeed(int pin) : vane_type(VANE_TYPE_DEFAULT), speed_sensor(pin), speed_sensor_interrupt(pin)
+WindSpeed::WindSpeed(int pin) : vane_type(VANE_TYPE_DEFAULT), speed_sensor(pin), last_valid_read_ts(0)
 {
 }
 
@@ -30,18 +32,16 @@ WindSpeed::~WindSpeed()
 
 void WindSpeed::read_data(wind_data &data, configuration &conf, unsigned long milliseconds)
 {
-  double frequency = 0.0;
-  //int counter = 0;
-  speed_sensor_interrupt.set_alpha(conf.get_speed_smoothing_factor());
   speed_sensor.set_alpha(conf.get_speed_smoothing_factor());
 
-  int counter = USE_SPEED_SENSOR_INTERRUPT ? speed_sensor_interrupt.get_counter() : speed_sensor.get_counter();
-  if (counter > 2 || (milliseconds - last_valid_reat_ts) > 999)
+  double frequency = 0.0;
+  int counter = speed_sensor.get_counter();
+  if (counter > 2 || (milliseconds - last_valid_read_ts) > 999)
   {
-    bool read = USE_SPEED_SENSOR_INTERRUPT ? speed_sensor_interrupt.read_data(milliseconds, frequency, counter) : speed_sensor.read_data(milliseconds, frequency, counter);
+    bool read = speed_sensor.read_data(milliseconds, frequency, counter);
     if (read)
     {
-      last_valid_reat_ts = milliseconds;
+      last_valid_read_ts = milliseconds;
       data.frequency = frequency;
       data.speed = frequency * adjustment_factor * ((vane_type == VANE_TYPE_ST60) ? HZ_TO_KNOTS_ST60 : HZ_TO_KNOTS_ST50);
       data.speed_error = WIND_ERROR_OK;
@@ -54,7 +54,7 @@ void WindSpeed::read_data(wind_data &data, configuration &conf, unsigned long mi
   }
   else
   {
-    //Log::tracex("WIND", "WindSpeed", "Ignoring speed sensor reading: counter {%d} time since last valid reading {%lu}ms", counter, milliseconds - last_valid_reat_ts);
+    //Log::tracex("WIND", "WindSpeed", "Ignoring speed sensor reading: counter {%d} time since last valid reading {%lu}ms", counter, milliseconds - last_valid_read_ts);
     // do nothing, keep previous value and wait for a valid reading
     // this should decrease the frequency of wind speed updates for very light winds, but reduce noise
   }
@@ -69,20 +69,11 @@ void WindSpeed::apply_configuration(configuration &conf)
 // the time is in micros! called from an ISR every 1ms
 void WindSpeed::loop_micros(unsigned long t)
 {
-  if (!USE_SPEED_SENSOR_INTERRUPT)
-    speed_sensor.loop_micros(t);
+  speed_sensor.loop_micros(t);
 }
 
 void WindSpeed::setup()
 {
-  if (USE_SPEED_SENSOR_INTERRUPT)
-  {
-    Log::tracex("WIND", "WindSpeed", "Using SpeedSensorInterrupt for wind speed measurement");
-    speed_sensor_interrupt.setup();
-  }
-  else
-  {
-    Log::tracex("WIND", "WindSpeed", "Using SpeedSensor for wind speed measurement");
-    speed_sensor.setup();
-  }
+  Log::tracex("WIND", "WindSpeed", "Setting up frequency meter");
+  speed_sensor.setup();
 }

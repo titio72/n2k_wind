@@ -173,6 +173,8 @@ void _loop()
     // log data
     do_log(conf, current_data, calibration.get_wind360());
   }
+
+  delay(25);
 }
 
 #ifndef PIO_UNIT_TESTING
