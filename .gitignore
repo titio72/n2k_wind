@@ -1,5 +1,14 @@
 .pio
 .vscode
+
+WindPCB/fp-info-cache
+WindPCB/WindPCB.kicad_prl
 WindPCB/WindPCB-backups
 WindPCB/~WindPCB.kicad_pcb.lck
-WindPCB/fp-info-cache
+WindPCB/~WindPCB.kicad_sch.lck
+
+WindPCB ADC/fp-info-cache
+WindPCB ADC/WindPCB.kicad_prl
+WindPCB ADC/WindPCB-backups
+WindPCB ADC/~WindPCB.kicad_pcb.lck
+WindPCB ADC/~WindPCB.kicad_sch.lck

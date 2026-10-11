@@ -5,7 +5,11 @@
 
 #include "Wind360.h"
 #include "WindSpeed.h"
+#ifdef USE_MCP320X
+#include "WindDirectionMCP320x.h"
+#else
 #include "WindDirection.h"
+#endif
 #include "LedDriver.h"
 #include "DataAndConf.h"
 #include "Calibration.h"
@@ -20,7 +24,11 @@ void on_ble_command(const char *command);
 
 #pragma region Global objects
 configuration conf;
+#ifdef USE_MCP320X
+WindDirectionMCP320x wind_direction;
+#else
 WindDirection wind_direction(COS_PIN, SIN_PIN);
+#endif
 WindSpeed wind_speed(SPEED_PIN);
 Calibration calibration(on_calibration_complete);
 BLEWind ble_wind(on_ble_command);
@@ -161,7 +169,7 @@ void _loop()
     ble_wind.loop(t_ms);
 
     // send data to n2k
-    if (check_elapsed(t_ms, wind_n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(current_data.get_out_angle(conf), current_data.wind.speed);
+    if (check_elapsed(t_ms, wind_n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(current_data.get_out_angle(conf), current_data.wind.speed, current_data.wind.ellipse);
     n2k_wind.loop(t_ms);
     current_data.n2k_err = n2k_wind.is_n2k_err() ? 1 : 0;
 

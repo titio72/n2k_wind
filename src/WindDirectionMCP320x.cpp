@@ -1,28 +1,53 @@
-/*
 #ifndef NATIVE
 #include <Arduino.h>
 #endif
 #include <math.h>
-#include "WindDirectionADS.h"
+#include "WindDirectionMCP320x.h"
 #include "WindUtil.h"
 
 #include <SPI.h>
 
 #ifndef MCP3202_CS_PIN
-#define MCP3202_CS_PIN GPIO_NUM_1
+#define MCP3202_CS_PIN GPIO_NUM_3 // D1 in Seed esp32-c3
+#endif
+
+#ifndef ADC_VREF
 #define ADC_VREF    3300     // 3.3V Vref
+#endif
+
+#ifndef ADC_CLK
 #define ADC_CLK     1600000  // SPI clock 1.6MHz
+#endif
+
+#ifndef MCP3202_SIN_CHANNEL
+#define MCP3202_SIN_CHANNEL 0
+#endif
+
+#ifndef MCP3202_COS_CHANNEL
+#define MCP3202_COS_CHANNEL 1
+#endif
+
+#if MCP3202_COS_CHANNEL==0
+static const MCP320xTypes::MCP3202::Channel COS_CHANNEL = MCP3202::Channel::SINGLE_0;
+#else
+static const MCP320xTypes::MCP3202::Channel COS_CHANNEL = MCP3202::Channel::SINGLE_1;
+#endif
+
+#if MCP3202_SIN_CHANNEL==0
+static const MCP320xTypes::MCP3202::Channel SIN_CHANNEL = MCP3202::Channel::SINGLE_0;
+#else
+static const MCP320xTypes::MCP3202::Channel SIN_CHANNEL = MCP3202::Channel::SINGLE_1;
 #endif
 
 #define SAMPLE_BUFFERING
 
-WindDirectionADS::WindDirectionADS() : ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0), adc(MCP3202_CS_PIN, ADC_VREF, ADC_CLK)
+WindDirectionMCP320x::WindDirectionMCP320x() : ix_buffer_cos(0), ix_buffer_sin(0), sumCos(0), sumSin(0), spiSettings(ADC_CLK, MSBFIRST, SPI_MODE0), adc(ADC_VREF, MCP3202_CS_PIN)
 {
     memset(sinBuffer, 0, sizeof(uint16_t) * SIN_COS_BUFFER_SIZE);
     memset(cosBuffer, 0, sizeof(uint16_t) * SIN_COS_BUFFER_SIZE);
 }
 
-WindDirectionADS::~WindDirectionADS()
+WindDirectionMCP320x::~WindDirectionMCP320x()
 {
 }
 
@@ -43,7 +68,7 @@ inline bool is_valid_reading(uint16_t reading)
 
 //------------------------
 
-void WindDirectionADS::loop_micros(unsigned long now_micros, uint16_t test_cos_reading, uint16_t test_sin_reading) // this is called from an ISR every 1ms
+void WindDirectionMCP320x::loop_micros(unsigned long now_micros, uint16_t test_cos_reading, uint16_t test_sin_reading) // this is called from an ISR every 1ms
 {
     if (test_sin_reading != UINT16_MAX && test_cos_reading != UINT16_MAX)
     {
@@ -57,15 +82,17 @@ void WindDirectionADS::loop_micros(unsigned long now_micros, uint16_t test_cos_r
 
     #ifndef NATIVE
     #ifdef SAMPLE_BUFFERING
-    uint16_t i_sin = adc.read(MCP3208::Channel::SINGLE_0);
-    uint16_t i_cos = adc.read(MCP3208::Channel::SINGLE_1);
+    SPI.beginTransaction(spiSettings);
+    uint16_t i_sin = adc.read(SIN_CHANNEL);
+    uint16_t i_cos = adc.read(COS_CHANNEL);
+    SPI.endTransaction();
     buffer_it(i_sin, sinBuffer, ix_buffer_sin, sumSin, n_samples_sin);
     buffer_it(i_cos, cosBuffer, ix_buffer_cos, sumCos, n_samples_cos);
     #endif
     #endif
 }
 
-void WindDirectionADS::setup()
+void WindDirectionMCP320x::setup()
 {
     #ifndef NATIVE
 
@@ -75,28 +102,30 @@ void WindDirectionADS::setup()
     // set initial PIN state
     digitalWrite(MCP3202_CS_PIN, HIGH);
 
-    // initialize SPI interface for MCP3208
-    SPISettings settings(ADC_CLK, MSBFIRST, SPI_MODE0);
+    // initialize SPI interface for MCP3202
     SPI.begin();
-    SPI.beginTransaction(settings);
 
     // for Rayarine, the output is 2V-6V, and we have a x2 divider, bringing the range to 1V-3V
     // The reference voltage is 3.3V, so we can use the default gain of 1x, which gives us a range of 0-4.096V, which is sufficient for our needs.
 
-    adc.calibrate(MCP3208::Channel::SINGLE_0);
-    adc.calibrate(MCP3208::Channel::SINGLE_1);
+    SPI.beginTransaction(spiSettings);
+    adc.calibrate(MCP3202::Channel::SINGLE_0);
+    adc.calibrate(MCP3202::Channel::SINGLE_1);
+    SPI.endTransaction();
     #endif
 }
 
-void WindDirectionADS::read_data(wind_data &wd, configuration &conf, unsigned long milliseconds)
+void WindDirectionMCP320x::read_data(wind_data &wd, configuration &conf, unsigned long milliseconds)
 {
     #ifdef SAMPLE_BUFFERING
     if (n_samples_cos == 0) return; // no data yet
     wd.i_cos = (uint16_t)round(sumCos / n_samples_cos);
     wd.i_sin = (uint16_t)round(sumSin / n_samples_sin);
     #else
-    wd.i_cos = analogRead(COS_PIN);
-    wd.i_sin = analogRead(SIN_PIN);
+    SPI.beginTransaction(spiSettings);
+    wd.i_sin = adc.read(SIN_CHANNEL);
+    wd.i_cos = adc.read(COS_CHANNEL);
+    SPI.endTransaction();
     #endif
     if (!is_valid_reading(wd.i_sin) || !is_valid_reading(wd.i_cos))
     {
@@ -117,9 +146,8 @@ void WindDirectionADS::read_data(wind_data &wd, configuration &conf, unsigned lo
     last_read_time = milliseconds;
 }
 
-void WindDirectionADS::apply_configuration(configuration &conf)
+void WindDirectionMCP320x::apply_configuration(configuration &conf)
 {
     sin_calib_range = conf.sin_range;
     cos_calib_range = conf.cos_range;
 }
-    */

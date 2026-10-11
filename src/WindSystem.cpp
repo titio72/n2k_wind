@@ -1,5 +1,6 @@
 #ifndef NATIVE
 #include <Arduino.h>
+#include <Ticker.h>
 #endif
 #include "WindSystem.h"
 #include "Constants.h"
@@ -11,8 +12,8 @@ static void (*on_timer_callback)(unsigned long microseconds) = nullptr;
 static LedDriver led;
 
 #ifndef NATIVE
-static hw_timer_t *timer = nullptr;
-void IRAM_ATTR on_timer()
+static Ticker ticker;
+void on_timer()
 {
     if (on_timer_callback)
         on_timer_callback(micros());
@@ -45,16 +46,15 @@ LedDriver &WindSystem::get_led()
 void WindSystem::setup()
 {
     #ifndef NATIVE
-    if (timer != nullptr)
+    if (ticker.active())
             return; // already initialized
     // set CPU frequency
     setCpuFrequencyMhz(CPU_FREQUENCY);
 
-    // initialize hw timer for wind measurement
-    timer = timerBegin(1, 80, true);              // Timer 0, clock divider 80
-    timerAttachInterrupt(timer, &on_timer, true); // Attach the interrupt handling function
-    timerAlarmWrite(timer, 1000, true);           // Interrupt every 1ms
-    timerAlarmEnable(timer);                      // Enable the alarm
+    // initialize timer for wind measurement
+    // Ticker dispatches on the esp_timer task (not from ISR context), so
+    // the callback chain is allowed to make blocking calls (e.g. SPI transactions).
+    ticker.attach_ms(1, on_timer); // call every 1ms
     #endif
 
     // initialize leds

@@ -1,15 +1,15 @@
-#ifndef _WIND_DIRECTION_ADS_H
-#define _WIND_DIRECTION_ADS_H
+#ifndef _WIND_DIRECTION_MCP320X_H
+#define _WIND_DIRECTION_MCP320X_H
 #include <stdint.h>
 #include "DataAndConf.h"
 #include <Mcp320x.h>
 
 
-class WindDirectionADS
+class WindDirectionMCP320x
 {
 public:
-    WindDirectionADS();
-    ~WindDirectionADS();
+    WindDirectionMCP320x();
+    ~WindDirectionMCP320x();
 
     void setup();
 
@@ -22,7 +22,8 @@ public:
     void apply_configuration(configuration &conf);
 
 private:
-    MCP3208 adc;
+    SPISettings spiSettings;
+    MCP3202 adc;
     uint16_t sinBuffer[SIN_COS_BUFFER_SIZE];
     uint16_t cosBuffer[SIN_COS_BUFFER_SIZE];
     uint16_t n_samples_cos = 0;

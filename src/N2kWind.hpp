@@ -42,25 +42,25 @@ public:
         n2k.set_desired_source(src);
     }
 
-    void send_N2K(double awd_deg, double aws_kn)
+    void send_N2K(double awd_deg, double aws_kn, double ellipse)
     {
         if (N2K_ENABLED && isnan(awd_deg) == false && isnan(aws_kn) == false)
         {
             tN2kMsg msg(n2k.get_source());
-            SetN2kWindSpeed(msg, 0, KnotsToms(aws_kn), DegToRad(awd_deg), tN2kWindReference::N2kWind_Apparent);
+            //SetN2kWindSpeed(msg, 0, KnotsToms(aws_kn), DegToRad(awd_deg), tN2kWindReference::N2kWind_Apparent);
+
+            msg.SetPGN(130306L);
+            msg.Priority=2;
+            msg.AddByte(0);
+            msg.Add2ByteUDouble(KnotsToms(aws_kn),0.01);
+            msg.Add2ByteUDouble(DegToRad(awd_deg),0.0001);
+            msg.AddByte((unsigned char)tN2kWindReference::N2kWind_Apparent);
+            msg.Add2ByteUDouble(ellipse,0.01); // Custom data - this last two bytes are "reserved"
+            
             n2k.send_msg(msg);
         }
     }
 
-    void send_stw(double stw_kn)
-    {
-        if (N2K_ENABLED && isnan(stw_kn) == false)
-        {
-            tN2kMsg msg(n2k.get_source());
-            SetN2kPGN128259(msg, 0, KnotsToms(stw_kn));
-            n2k.send_msg(msg);
-        }
-    }
 
     void loop(unsigned long milliseconds)
     {

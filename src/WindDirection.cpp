@@ -60,8 +60,8 @@ void WindDirection::setup()
     // initilize ADC
     // set attenuation to read up to 2V (preferred range 150mV - 1750mV)
     // for Rayarine, the output is 2V-6V, hence we need a x3 divider, bringing the range to 667mv-2000mV
-    analogSetPinAttenuation(SIN_PIN, adc_attenuation_t::ADC_11db);
-    analogSetPinAttenuation(COS_PIN, adc_attenuation_t::ADC_11db);
+    analogSetPinAttenuation(sinPin, adc_attenuation_t::ADC_11db);
+    analogSetPinAttenuation(cosPin, adc_attenuation_t::ADC_11db);
     #endif
 }
 
@@ -72,8 +72,8 @@ void WindDirection::read_data(wind_data &wd, configuration &conf, unsigned long 
     wd.i_cos = (uint16_t)round(sumCos / n_samples_cos);
     wd.i_sin = (uint16_t)round(sumSin / n_samples_sin);
     #else
-    wd.i_cos = analogRead(COS_PIN);
-    wd.i_sin = analogRead(SIN_PIN);
+    wd.i_cos = analogRead(cosPin);
+    wd.i_sin = analogRead(sinPin);
     #endif
     if (!is_valid_reading(wd.i_sin) || !is_valid_reading(wd.i_cos))
     {
