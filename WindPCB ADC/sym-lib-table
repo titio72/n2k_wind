@@ -1,0 +1,5 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "Seeduino")(type "KiCad")(uri "${KIPRJMOD}/libs/Seeduino.kicad_sym")(options "")(descr "Seeeduino XIAO"))
+	(lib (name "1267")(type "KiCad")(uri "${KIPRJMOD}/libs/1267.kicad_sym")(options "")(descr "Keystone 1267 test point"))
+)

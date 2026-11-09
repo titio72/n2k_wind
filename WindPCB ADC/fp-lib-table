@@ -1,0 +1,6 @@
+(fp_lib_table
+	(version 7)
+	(lib (name "WindPCB")(type "KiCad")(uri "${KIPRJMOD}/footprints.pretty")(options "")(descr "Project footprints"))
+	(lib (name "seeduino")(type "KiCad")(uri "${KIPRJMOD}/libs/seeduino.pretty")(options "")(descr "Seeeduino XIAO footprint"))
+	(lib (name "connectors")(type "KiCad")(uri "${KIPRJMOD}/libs/connectors.pretty")(options "")(descr "Keystone 1267 footprint"))
+)
