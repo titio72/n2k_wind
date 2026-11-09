@@ -16,7 +16,7 @@
 #endif
 
 #ifndef ADC_CLK
-#define ADC_CLK     1600000  // SPI clock 1.6MHz
+#define ADC_CLK     1000000  // SPI clock 1MHz (MCP3202 @3.3V is rated below 1.6MHz)
 #endif
 
 #ifndef MCP3202_SIN_CHANNEL
