@@ -46,8 +46,8 @@ public:
         n2k.set_desired_source(src);
     }
 
-    // reference: PGN 130306 byte 5 (see wind_reference_byte)
-    void send_N2K(double awd_deg, double aws_kn, double ellipse, uint8_t reference)
+    // status: PGN 130306 byte 7 (see wind_status_byte)
+    void send_N2K(double awd_deg, double aws_kn, double ellipse, uint8_t status)
     {
         if (N2K_ENABLED && isnan(awd_deg) == false && isnan(aws_kn) == false)
         {
@@ -59,8 +59,10 @@ public:
             msg.AddByte(0);
             msg.Add2ByteUDouble(KnotsToms(aws_kn),0.01);
             msg.Add2ByteUDouble(DegToRad(awd_deg),0.0001);
-            msg.AddByte(reference);
-            msg.Add2ByteUDouble(ellipse,0.01); // Custom data - this last two bytes are "reserved"
+            msg.AddByte((unsigned char)tN2kWindReference::N2kWind_Apparent);
+            // Custom data in the two "reserved" bytes (see CorrectionProtocol.h)
+            msg.AddByte(wind_ellipse_byte(ellipse));
+            msg.AddByte(status);
             
             n2k.send_msg(msg);
         }

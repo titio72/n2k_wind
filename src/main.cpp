@@ -251,7 +251,7 @@ void _loop()
       current_data.correction.corrected = out.corrected ? 1 : 0;
       current_data.correction.awa = out.awa;
       current_data.correction.aws = out.aws;
-      n2k_wind.send_N2K(out.awa, out.aws, current_data.wind.ellipse, out.reference);
+      n2k_wind.send_N2K(out.awa, out.aws, current_data.wind.ellipse, out.status);
     }
     current_data.n2k_err = n2k_wind.is_n2k_err() ? 1 : 0;
 

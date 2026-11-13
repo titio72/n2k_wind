@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Shared vectors for the wind correction table (n2k_wind encoder/correction, rust_nmea_router decoder/inversion). Angles in degrees, speeds in knots. Sample awa/aws are the raw apparent wind; out_awa/out_aws are what the sensor sends on PGN 130306; reference is 130306 byte 5.",
+  "description": "Shared vectors for the wind correction table (n2k_wind encoder/correction, rust_nmea_router decoder/inversion). Angles in degrees, speeds in knots. Sample awa/aws are the raw apparent wind; out_awa/out_aws are what the sensor sends on PGN 130306. PGN 130306 byte 5 is always 0x02 (apparent); 'status' is byte 7: bit 3 corrected, bits 4-7 table_id low nibble. Byte 6 is the vane ellipse x100 (0xFF n/a).",
   "manufacturer_code": 2046,
   "pgn": 130900,
   "table": {
@@ -57,7 +57,7 @@
       "stw": 6,
       "out_awa": 38.2193,
       "out_aws": 15.1701,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 320,
@@ -65,7 +65,7 @@
       "stw": 6,
       "out_awa": 321.7807,
       "out_aws": 15.1701,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 95,
@@ -73,7 +73,7 @@
       "stw": 6.5,
       "out_awa": 96.0454,
       "out_aws": 12.1659,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 150,
@@ -81,7 +81,7 @@
       "stw": 7.5,
       "out_awa": 152.08,
       "out_aws": 20.2697,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 40,
@@ -89,7 +89,7 @@
       "stw": 2,
       "out_awa": 36.87,
       "out_aws": 4.1106,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 40,
@@ -97,7 +97,7 @@
       "stw": 0,
       "out_awa": 36.5,
       "out_aws": 10.0,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 170,
@@ -105,7 +105,7 @@
       "stw": 5,
       "out_awa": 170.7089,
       "out_aws": 8.0964,
-      "reference": 234
+      "status": 232
     },
     {
       "awa": 40,
@@ -113,7 +113,7 @@
       "stw": 8,
       "out_awa": 37.6622,
       "out_aws": 30.258,
-      "reference": 234
+      "status": 232
     }
   ]
 }

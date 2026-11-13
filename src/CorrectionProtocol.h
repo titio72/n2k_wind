@@ -29,8 +29,15 @@ size_t encode_correction_table(const correction_table &t, uint16_t manufacturer_
 
 uint32_t correction_table_id(const correction_table &t);
 
-// PGN 130306 byte 5: bits 0-2 reference (apparent), bit 3 corrected,
-// bits 4-7 table_id low nibble when corrected.
-uint8_t wind_reference_byte(bool corrected, uint32_t table_id);
+// PGN 130306 trailer. Byte 5 stays the standard wind reference (apparent),
+// so standard equipment sees a normal message. The last two bytes are
+// reserved in the standard; this sensor has always used them for the vane
+// ellipse, and now splits them:
+//   byte 6: ellipse x100 (0..254 = 0.00..2.54, 0xFF n/a)
+//   byte 7: correction status: bit 3 corrected, bits 4-7 table_id low nibble
+// Older firmware sent the ellipse as a 2-byte value here: for ellipse < 2.55
+// its byte 6 is identical and its byte 7 is 0 (= uncorrected).
+uint8_t wind_ellipse_byte(double ellipse);
+uint8_t wind_status_byte(bool corrected, uint32_t table_id);
 
 #endif

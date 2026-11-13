@@ -1,5 +1,6 @@
 #include <unity.h>
 #include <string.h>
+#include <math.h>
 #include "../src/WindCorrection.h"
 #include "../src/CorrectionProtocol.h"
 
@@ -64,10 +65,26 @@ void test_buffer_too_small(void)
     TEST_ASSERT_EQUAL_UINT32(0, encode_correction_table(t, 2046, buf, 43));
 }
 
-void test_reference_byte(void)
+// PGN 130306 byte 7: bit 3 corrected, bits 4-7 table_id low nibble.
+void test_status_byte(void)
 {
-    TEST_ASSERT_EQUAL_HEX8(0xEA, wind_reference_byte(true, 0x5330A1DE));
-    TEST_ASSERT_EQUAL_HEX8(0x02, wind_reference_byte(false, 0x5330A1DE));
+    TEST_ASSERT_EQUAL_HEX8(0xE8, wind_status_byte(true, 0x5330A1DE));
+    TEST_ASSERT_EQUAL_HEX8(0x08, wind_status_byte(true, 0x41D912F0));
+    TEST_ASSERT_EQUAL_HEX8(0x00, wind_status_byte(false, 0x5330A1DE));
+}
+
+// PGN 130306 byte 6: ellipse x100, 0..254, 0xFF n/a. Matches the low byte of
+// the old 2-byte encoding for ellipse < 2.55, whose high byte (now byte 7)
+// was 0 = "uncorrected".
+void test_ellipse_byte(void)
+{
+    TEST_ASSERT_EQUAL_HEX8(100, wind_ellipse_byte(1.0));
+    TEST_ASSERT_EQUAL_HEX8(123, wind_ellipse_byte(1.234));
+    TEST_ASSERT_EQUAL_HEX8(0, wind_ellipse_byte(0.0));
+    TEST_ASSERT_EQUAL_HEX8(254, wind_ellipse_byte(2.54));
+    TEST_ASSERT_EQUAL_HEX8(254, wind_ellipse_byte(7.0));
+    TEST_ASSERT_EQUAL_HEX8(0xFF, wind_ellipse_byte(NAN));
+    TEST_ASSERT_EQUAL_HEX8(0xFF, wind_ellipse_byte(-1.0));
 }
 
 int main(int argc, char **argv)
@@ -80,6 +97,7 @@ int main(int argc, char **argv)
     RUN_TEST(test_table_ids);
     RUN_TEST(test_full_table_size);
     RUN_TEST(test_buffer_too_small);
-    RUN_TEST(test_reference_byte);
+    RUN_TEST(test_status_byte);
+    RUN_TEST(test_ellipse_byte);
     return UNITY_END();
 }

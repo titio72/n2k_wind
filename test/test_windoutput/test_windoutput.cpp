@@ -22,7 +22,7 @@ void tearDown(void) {}
 static void assert_uncorrected(const wind_output &o, double awa, double aws)
 {
     TEST_ASSERT_FALSE(o.corrected);
-    TEST_ASSERT_EQUAL_HEX8(0x02, o.reference);
+    TEST_ASSERT_EQUAL_HEX8(0x00, o.status);
     TEST_ASSERT_EQUAL_DOUBLE(awa, o.awa);
     TEST_ASSERT_EQUAL_DOUBLE(aws, o.aws);
 }
@@ -31,7 +31,7 @@ void test_corrected_sample(void)
 {
     wind_output o = compute_wind_output(make_t1(), T1_ID, 40, 15, true, 6);
     TEST_ASSERT_TRUE(o.corrected);
-    TEST_ASSERT_EQUAL_HEX8(0xEA, o.reference);
+    TEST_ASSERT_EQUAL_HEX8(0xE8, o.status);
     TEST_ASSERT_DOUBLE_WITHIN(1e-3, 38.2193, o.awa);
     TEST_ASSERT_DOUBLE_WITHIN(1e-3, 15.1701, o.aws);
 }
@@ -46,7 +46,7 @@ void test_nan_wind(void)
 {
     wind_output o = compute_wind_output(make_t1(), T1_ID, NAN, 15, true, 6);
     TEST_ASSERT_FALSE(o.corrected);
-    TEST_ASSERT_EQUAL_HEX8(0x02, o.reference);
+    TEST_ASSERT_EQUAL_HEX8(0x00, o.status);
     TEST_ASSERT_TRUE(isnan(o.awa));
     TEST_ASSERT_EQUAL_DOUBLE(15, o.aws);
 }

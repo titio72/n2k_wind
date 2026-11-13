@@ -113,12 +113,16 @@ BLE data: append `table_id`, the enabled flag, the corrected flag, and the corre
 
 ### PGN 130306: "corrected" flag
 
-Byte 5 of 130306 holds the wind reference in its low 3 bits; the remaining 5 bits are reserved. We use them:
+Byte 5 (wind reference) stays exactly `0x02` (apparent), so standard equipment sees a normal 130306. (Revised: the flag first lived in byte 5's reserved bits, but equipment that compares the whole byte to 2 would have rejected the message.)
 
-- **Bit 3:** 1 when the sample was corrected, 0 otherwise.
-- **Bits 4–7:** when bit 3 is set, the low 4 bits of the `table_id` that corrected the sample; 0 otherwise.
+The last two bytes are reserved in the standard. This sensor has always used them, non-standard, for the vane ellipse (a 2-byte value, 0.01 resolution), and the equipment on board accepts that. They are now split:
 
-The existing non-standard use of the last two reserved bytes for `ellipse` stays as it is. Other devices ignore reserved bits. The router uses bit 3 to know which samples to invert, and the 4-bit tag to check every sample against the table it thinks is active. That way a lost or late 130900 broadcast can't make it invert with the wrong table unnoticed. (My call: the review raised it; it costs nothing and protects the "wrong table" anti-goal.)
+- **Byte 6:** ellipse × 100 as one byte: 0–254 (0.00–2.54), 255 = not available. An ellipse above 1.5 already means the calibration is off, so the cap loses nothing.
+- **Byte 7:** correction status. Bit 3: 1 when the sample was corrected. Bits 4–7: when bit 3 is set, the low 4 bits of the `table_id` that corrected the sample; 0 otherwise. Bits 0–2: 0.
+
+Backward compatibility: older firmware's 2-byte ellipse has, for any ellipse below 2.55, the same byte 6 and a byte 7 of 0, which reads as "uncorrected". So a router reading this layout can't misread older firmware.
+
+The router uses bit 3 to know which samples to invert, and the 4-bit tag to check every sample against the table it thinks is active. That way a lost or late 130900 broadcast can't make it invert with the wrong table unnoticed. (My call: the review raised it; it costs nothing and protects the "wrong table" anti-goal.)
 
 On a table change, the sensor sends the new 130900 broadcast **before** it starts correcting with the new table.
 
@@ -181,7 +185,7 @@ The deliverable is a short one-off script (in the router's `scripts/`) that prin
   - the PGN 130900 encoder against golden bytes
   - persistence: an old EEPROM image with no table block loads the configuration intact, with an empty, disabled table
 - **Shared test vectors:** a small set (table bytes plus sample in/out values) committed to both repos, so the sensor encoder and correction, and the router decoder and inversion, are checked against the same numbers.
-- **On the bus:** candump shows 130900 at startup, on change and every 60 s, and the 130306 flag bit following the enable switch and boat-speed availability.
+- **On the bus:** candump shows 130900 at startup, on change and every 60 s, and byte 5 of 130306 staying `02`, and the byte 7 corrected bit following the enable switch and boat-speed availability.
 
 ## Left to the builder
 

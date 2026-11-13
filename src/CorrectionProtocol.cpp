@@ -1,8 +1,8 @@
 #include "CorrectionProtocol.h"
+#include <math.h>
 
 #define CORRECTION_HEADER_SIZE 8
 #define CORRECTION_ROW_SIZE (2 + 5 * CORRECTION_ANCHORS)
-#define WIND_REFERENCE_APPARENT 2
 
 uint32_t crc32_ieee(const uint8_t *data, size_t len)
 {
@@ -67,9 +67,17 @@ uint32_t correction_table_id(const correction_table &t)
     return crc32_ieee(buf + CORRECTION_HEADER_SIZE, len - CORRECTION_HEADER_SIZE);
 }
 
-uint8_t wind_reference_byte(bool corrected, uint32_t table_id)
+uint8_t wind_ellipse_byte(double ellipse)
+{
+    if (isnan(ellipse) || ellipse < 0.0)
+        return 0xFF;
+    double v = round(ellipse * 100.0);
+    return (uint8_t)(v > 254.0 ? 254.0 : v);
+}
+
+uint8_t wind_status_byte(bool corrected, uint32_t table_id)
 {
     if (!corrected)
-        return WIND_REFERENCE_APPARENT;
-    return (uint8_t)(WIND_REFERENCE_APPARENT | 0x08 | ((table_id & 0x0F) << 4));
+        return 0;
+    return (uint8_t)(0x08 | ((table_id & 0x0F) << 4));
 }
