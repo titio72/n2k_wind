@@ -11,21 +11,34 @@ void correction_clear(correction_table &t)
     memset(&t, 0, sizeof(t));
 }
 
+// |delta_v| <= 0.5 * delta_x, with v and x in the same 0.1 units
+static bool slope_ok(long delta_v, long delta_x_tenths)
+{
+    return 2 * labs(delta_v) <= delta_x_tenths;
+}
+
 bool correction_row_valid(const correction_row &r)
 {
     if (r.tws > CORRECTION_MAX_TWS)
         return false;
-    int prev = 0;
+    int prev_angle = 0;
+    int prev_da = 0; // taper from 0 at 0 deg
     for (int i = 0; i < CORRECTION_ANCHORS; i++)
     {
         const correction_anchor &a = r.anchors[i];
-        if (a.angle <= prev || a.angle >= 180)
+        if (a.angle <= prev_angle || a.angle >= 180)
             return false;
         if (abs(a.d_angle) > CORRECTION_MAX_D_ANGLE || abs(a.d_speed) > CORRECTION_MAX_D_SPEED)
             return false;
-        prev = a.angle;
+        if (!slope_ok(a.d_angle - prev_da, 10L * (a.angle - prev_angle)))
+            return false;
+        if (!slope_ok(a.d_speed, r.tws))
+            return false;
+        prev_angle = a.angle;
+        prev_da = a.d_angle;
     }
-    return true;
+    // taper to 0 at 180 deg
+    return slope_ok(prev_da, 10L * (180 - prev_angle));
 }
 
 bool correction_table_valid(const correction_table &t)
@@ -36,8 +49,15 @@ bool correction_table_valid(const correction_table &t)
     {
         if (!correction_row_valid(t.rows[i]))
             return false;
-        if (i > 0 && t.rows[i].tws <= t.rows[i - 1].tws)
-            return false;
+        if (i > 0)
+        {
+            const correction_row &a = t.rows[i - 1], &b = t.rows[i];
+            if (b.tws <= a.tws)
+                return false;
+            for (int j = 0; j < CORRECTION_ANCHORS; j++)
+                if (!slope_ok(b.anchors[j].d_speed - a.anchors[j].d_speed, b.tws - a.tws))
+                    return false;
+        }
     }
     return true;
 }
@@ -51,15 +71,23 @@ bool correction_upsert(correction_table &t, const correction_row &r)
         pos++;
     if (pos < t.n_rows && t.rows[pos].tws == r.tws)
     {
-        t.rows[pos] = r;
+        correction_table edited = t;
+        edited.rows[pos] = r;
+        if (!correction_table_valid(edited))
+            return false;
+        t = edited;
         return true;
     }
     if (t.n_rows >= CORRECTION_MAX_ROWS)
         return false;
-    for (int i = t.n_rows; i > pos; i--)
-        t.rows[i] = t.rows[i - 1];
-    t.rows[pos] = r;
-    t.n_rows++;
+    correction_table edited = t;
+    for (int i = edited.n_rows; i > pos; i--)
+        edited.rows[i] = edited.rows[i - 1];
+    edited.rows[pos] = r;
+    edited.n_rows++;
+    if (!correction_table_valid(edited))
+        return false;
+    t = edited;
     return true;
 }
 
@@ -200,6 +228,8 @@ bool correct_wind(const correction_table &t, double awa_deg, double aws_kn, doub
     out_awa_deg = awa_deg;
     out_aws_kn = aws_kn;
     if (!t.enabled || t.n_rows == 0 || isnan(awa_deg) || isnan(aws_kn) || isnan(stw_kn))
+        return false;
+    if (aws_kn < CORRECTION_MIN_AWS_KN)
         return false;
 
     double a = awa_deg * DEG_TO_RAD_F;

@@ -15,6 +15,15 @@
 #define CORRECTION_MAX_D_ANGLE 300  // 30.0 deg
 #define CORRECTION_MAX_D_SPEED 100  // 10.0 kn
 
+// Below this apparent wind speed (cups stopped) there is no wind direction
+// to correct: the sample passes through.
+#define CORRECTION_MIN_AWS_KN 0.1
+
+// Validation also bounds every correction slope to 0.5 (dA per degree of
+// angle, including the tapers to 0 at 0 and 180 deg; dS per knot of TWS,
+// including dS against the row's own TWS). Steeper tables fold the output
+// across itself and cannot be inverted by the router.
+
 struct correction_anchor
 {
     uint8_t angle;   // deg, 1..179

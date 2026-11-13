@@ -253,7 +253,6 @@ void _loop()
       current_data.correction.aws = out.aws;
       n2k_wind.send_N2K(out.awa, out.aws, current_data.wind.ellipse, out.reference);
     }
-    n2k_wind.loop(t_ms);
     current_data.n2k_err = n2k_wind.is_n2k_err() ? 1 : 0;
 
     // update led
@@ -264,6 +263,11 @@ void _loop()
     // log data
     do_log(conf, current_data, calibration.get_wind360());
   }
+
+  // Drain the CAN RX queue every pass, not every 250 ms: the TWAI driver
+  // queues only 5 frames and drops the rest, so a busy bus would starve
+  // the STW (PGN 128259) the correction needs.
+  n2k_wind.loop(t_ms);
 
   delay(25);
 }

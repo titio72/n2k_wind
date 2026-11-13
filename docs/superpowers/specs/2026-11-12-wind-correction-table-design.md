@@ -72,6 +72,8 @@ The mounting offset (`conf.offset`) stays separate and is applied before the tab
 - *Builder's call / my call:* angle and speed corrections share the same anchor angles. NKE uses two separate tables with their own anchors; sharing keeps the table and the protocol small and matches NKE's example tables, where the anchors are identical.
 - Rows sorted by TWS, anchors sorted by angle. Validation rejects anything else.
 - Resolution: TWS 0.1 kn, angle 1°, `dA` 0.1°, `dS` 0.1 kn. Limits: |dA| ≤ 30°, |dS| ≤ 10 kn.
+- Slope limit (added after review): every correction slope is at most 0.5, i.e. |ΔdA| ≤ 0.5·Δangle between anchors and on the tapers to 0° and 180°, |dS| ≤ 0.5·TWS within a row, and |ΔdS| ≤ 0.5·ΔTWS between rows (same anchor index). Steeper tables fold the output across itself and break the router's fixed-point inversion.
+- No correction when AWS < 0.1 kn (cups stopped): there is no direction to correct, and a zero vector can't be inverted.
 - Default: empty (no rows) and **disabled**.
 
 **Interpolation (my call):**

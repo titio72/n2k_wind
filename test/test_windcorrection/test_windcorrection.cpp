@@ -122,6 +122,37 @@ void test_correct_nan_passthrough(void)
     check_passthrough(t, 40, 15, NAN);
 }
 
+// Review finding: cups stopped (AWS 0) must not fabricate a 0/90 deg angle.
+void test_correct_no_wind_passthrough(void)
+{
+    correction_table t = make_t1();
+    check_passthrough(t, 40, 0, 0);
+    check_passthrough(t, 40, 0, 5);
+    check_passthrough(t, 300, 0.05, 5);
+}
+
+// Output angle must increase monotonically (circularly) as AWA sweeps 0..360.
+void test_correct_monotonic_sweep(void)
+{
+    correction_table t = make_t1();
+    const double speeds[][2] = {{15, 6}, {4, 2}, {30, 8}, {8, 5}};
+    for (auto &sp : speeds)
+    {
+        double prev = NAN;
+        for (int i = 0; i <= 3600; i++)
+        {
+            double oa, os;
+            TEST_ASSERT_TRUE(correct_wind(t, i / 10.0, sp[0], sp[1], oa, os));
+            if (!isnan(prev))
+            {
+                double step = fmod(oa - prev + 540.0, 360.0) - 180.0;
+                TEST_ASSERT_TRUE(step >= 0.0 && step < 1.0);
+            }
+            prev = oa;
+        }
+    }
+}
+
 // Spec "Testing": correct, then invert (router's fixed-point algorithm),
 // gives back the original within 0.05 deg.
 static void invert(const correction_table &t, double awa, double aws, double stw,
@@ -210,6 +241,38 @@ void test_upsert_invalid_rows_rejected(void)
     TEST_ASSERT_EQUAL_MEMORY(&before, &t, sizeof(t));
 }
 
+// Review finding: rows whose correction slope would fold the output
+// (or break the router's fixed-point inversion) are rejected.
+void test_row_rejects_folding_slopes(void)
+{
+    correction_row r;
+    r = {60, {{5, -100, 0}, {95, -10, 0}, {150, 0, 0}}};     // -10 deg at 5 deg: folds across the bow
+    TEST_ASSERT_FALSE(correction_row_valid(r));
+    r = {60, {{40, 0, 0}, {95, 0, 0}, {170, 300, 0}}};       // +30 deg at 170: folds across the stern
+    TEST_ASSERT_FALSE(correction_row_valid(r));
+    r = {60, {{40, 300, 0}, {50, -300, 0}, {150, 0, 0}}};    // mid-range fold
+    TEST_ASSERT_FALSE(correction_row_valid(r));
+    r = {60, {{45, 0, -40}, {95, 0, -40}, {150, 0, -40}}};   // -4 kn at 6 kn TWS
+    TEST_ASSERT_FALSE(correction_row_valid(r));
+    // limits are inclusive
+    r = {60, {{40, -200, 30}, {95, 75, 30}, {150, -75, 30}}};
+    TEST_ASSERT_TRUE(correction_row_valid(r));
+}
+
+void test_table_rejects_steep_speed_change_between_rows(void)
+{
+    correction_table t;
+    correction_clear(t);
+    TEST_ASSERT_TRUE(correction_upsert(t, {60, {{45, 0, 0}, {95, 0, 0}, {150, 0, 0}}}));
+    correction_table before = t;
+    // +3 kn over 4 kn of TWS
+    TEST_ASSERT_FALSE(correction_upsert(t, {100, {{45, 0, 30}, {95, 0, 0}, {150, 0, 0}}}));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &t, sizeof(t));
+    t.n_rows = 2;
+    t.rows[1] = {100, {{45, 0, 30}, {95, 0, 0}, {150, 0, 0}}};
+    TEST_ASSERT_FALSE(correction_table_valid(t));
+}
+
 void test_delete(void)
 {
     correction_table t = make_t1();
@@ -288,10 +351,14 @@ int runUnityTests(void)
     RUN_TEST(test_correct_disabled_passthrough);
     RUN_TEST(test_correct_empty_passthrough);
     RUN_TEST(test_correct_nan_passthrough);
+    RUN_TEST(test_correct_no_wind_passthrough);
+    RUN_TEST(test_correct_monotonic_sweep);
     RUN_TEST(test_roundtrip_inversion);
     RUN_TEST(test_upsert_orders_and_replaces);
     RUN_TEST(test_upsert_full_table_rejected);
     RUN_TEST(test_upsert_invalid_rows_rejected);
+    RUN_TEST(test_row_rejects_folding_slopes);
+    RUN_TEST(test_table_rejects_steep_speed_change_between_rows);
     RUN_TEST(test_delete);
     RUN_TEST(test_table_valid);
     RUN_TEST(test_parse_row);
