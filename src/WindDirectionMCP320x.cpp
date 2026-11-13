@@ -1,4 +1,5 @@
 #ifndef NATIVE
+#ifndef NATIVE
 #include <Arduino.h>
 #endif
 #include <math.h>
@@ -151,3 +152,4 @@ void WindDirectionMCP320x::apply_configuration(configuration &conf)
     sin_calib_range = conf.sin_range;
     cos_calib_range = conf.cos_range;
 }
+#endif // NATIVE

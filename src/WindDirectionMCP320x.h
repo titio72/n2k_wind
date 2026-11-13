@@ -1,3 +1,4 @@
+#ifndef NATIVE
 #ifndef _WIND_DIRECTION_MCP320X_H
 #define _WIND_DIRECTION_MCP320X_H
 #include <stdint.h>
@@ -34,3 +35,4 @@ private:
     unsigned long last_read_time = 0;
 };
 #endif
+#endif // NATIVE
