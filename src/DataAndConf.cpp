@@ -67,7 +67,7 @@ void configuration::set_ble_name(const char *name)
 bool ConfPersistence::write(configuration &conf)
 {
   // Log::trace("[CONF] Writing configuration to EEPROM {%d}\n", sizeof(Conf));
-  if (EEE.begin(sizeof(configuration)))
+  if (EEE.begin(EEPROM_TOTAL_SIZE))
   {
     Log::trace("[CONF] Writing configuration\n");
     EEE.put(0, conf);
@@ -85,7 +85,7 @@ bool ConfPersistence::write(configuration &conf)
 
 bool ConfPersistence::read(configuration &conf, int *error_code)
 {
-  if (EEE.begin(sizeof(configuration)))
+  if (EEE.begin(EEPROM_TOTAL_SIZE))
   {
     bool read = false;
     if (EEE.readChar(0) == CONF_SERIAL)

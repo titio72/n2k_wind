@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "WindUtil.h"
+#include "WindCorrection.h"
 
 #define CONF_SERIAL 12
 
@@ -39,6 +40,11 @@ public:
 
 
 };
+
+// One EEPROM blob holds the configuration and, after it, the correction
+// table block (magic + version + table). On ESP32 commit() writes exactly
+// begin(size) bytes, so every writer must open it with this total size.
+#define EEPROM_TOTAL_SIZE (sizeof(configuration) + 2 + sizeof(correction_table))
 
 class ConfPersistence
 {
