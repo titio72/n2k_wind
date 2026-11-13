@@ -19,11 +19,15 @@
 #include "WindSystem.h"
 #include "WindCorrection.h"
 #include "CorrectionPersistence.h"
+#include "CorrectionProtocol.h"
+#include "BoatSpeed.h"
+#include "WindOutput.h"
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src);
 bool on_calibration_complete(const Range &s_range, const Range &c_range);
 void on_ble_command(const char *command);
 void on_table_changed();
+void on_n2k_message(const tN2kMsg &msg);
 
 #pragma region Global objects
 configuration conf;
@@ -35,13 +39,16 @@ WindDirection wind_direction(COS_PIN, SIN_PIN);
 WindSpeed wind_speed(SPEED_PIN);
 Calibration calibration(on_calibration_complete);
 BLEWind ble_wind(on_ble_command);
-N2KWind n2k_wind(on_n2k_source);
+N2KWind n2k_wind(on_n2k_message, on_n2k_source);
 ConfPersistence confPersistence;
 // BLE commands (NimBLE task) edit table_edit and raise table_changed;
 // the main loop adopts it into table_active (see _loop).
 correction_table table_edit;
 CorrectionPersistence correctionPersistence;
 volatile bool table_changed = false;
+correction_table table_active; // used by the main loop only
+uint32_t table_id = 0;          // correction_table_id(table_active)
+BoatSpeed boat_speed;
 CommandHandler cmd_handler(conf, confPersistence, calibration, ble_wind, table_edit, correctionPersistence, on_table_changed);
 #pragma endregion
 
@@ -59,6 +66,9 @@ void _setup()
 
   // read configuration from eeprom
   confPersistence.read(conf);
+  correctionPersistence.read(table_edit); // empty + disabled if missing/invalid
+  table_active = table_edit;
+  table_id = correction_table_id(table_active);
   WindSystem::enable_usb_tracing(true);
 
   // initialize wind measurement
@@ -122,6 +132,54 @@ void on_table_changed()
   table_changed = true;
 }
 
+// Called from n2k_wind.loop() (main loop)
+void on_n2k_message(const tN2kMsg &msg)
+{
+  if (msg.PGN == 128259L)
+  {
+    unsigned char sid;
+    double water, ground;
+    tN2kSpeedWaterReferenceType swrt;
+    if (ParseN2kBoatSpeed(msg, sid, water, ground, swrt) && !N2kIsNA(water))
+    {
+      boat_speed.on_stw(msToKnots(water), msg.Source, millis());
+    }
+  }
+}
+
+// Adopts the table edited over BLE, then keeps broadcasting it.
+// The new table is broadcast before it is used for any sample.
+void manage_correction_table(unsigned long t_ms)
+{
+  static bool broadcast_done = false;
+  static unsigned long last_broadcast = 0;
+  if (table_changed)
+  {
+    table_changed = false;
+    correction_table copy = table_edit;
+    // table_edit is written by the BLE task: if another edit raced with the
+    // copy (flag raised again, or a torn/invalid copy) retry on the next loop.
+    if (table_changed || !correction_table_valid(copy))
+    {
+      table_changed = true;
+      return;
+    }
+    table_active = copy;
+    table_id = correction_table_id(table_active);
+    Log::trace("[CORR] New table id {%08x} enabled {%d} rows {%d}\n", table_id, table_active.enabled, table_active.n_rows);
+    n2k_wind.send_correction_table(table_active);
+    broadcast_done = true;
+    last_broadcast = t_ms;
+  }
+  else if ((!broadcast_done && t_ms >= CORRECTION_TABLE_FIRST_BROADCAST) ||
+           (broadcast_done && (t_ms - last_broadcast) >= CORRECTION_TABLE_BROADCAST_PERIOD))
+  {
+    n2k_wind.send_correction_table(table_active);
+    broadcast_done = true;
+    last_broadcast = t_ms;
+  }
+}
+
 void on_n2k_source(unsigned char old_src, unsigned char new_src)
 {
   Log::trace("[N2K] Source changed from {%d} to {%d}\n", old_src, new_src);
@@ -182,7 +240,19 @@ void _loop()
     ble_wind.loop(t_ms);
 
     // send data to n2k
-    if (check_elapsed(t_ms, wind_n2k_t0, WIND_N2K_DATA_FREQ)) n2k_wind.send_N2K(current_data.get_out_angle(conf), current_data.wind.speed, current_data.wind.ellipse);
+    manage_correction_table(t_ms);
+    if (check_elapsed(t_ms, wind_n2k_t0, WIND_N2K_DATA_FREQ))
+    {
+      double stw = NAN;
+      bool stw_ok = boat_speed.get(t_ms, stw);
+      wind_output out = compute_wind_output(table_active, table_id, current_data.get_out_angle(conf), current_data.wind.speed, stw_ok, stw);
+      current_data.correction.table_id = table_id;
+      current_data.correction.enabled = table_active.enabled;
+      current_data.correction.corrected = out.corrected ? 1 : 0;
+      current_data.correction.awa = out.awa;
+      current_data.correction.aws = out.aws;
+      n2k_wind.send_N2K(out.awa, out.aws, current_data.wind.ellipse, out.reference);
+    }
     n2k_wind.loop(t_ms);
     current_data.n2k_err = n2k_wind.is_n2k_err() ? 1 : 0;
 

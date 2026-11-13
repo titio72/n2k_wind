@@ -4,6 +4,8 @@
 #include <N2K.h>
 #include <Log.h>
 #include "WindUtil.h"
+#include "WindCorrection.h"
+#include "CorrectionProtocol.h"
 
 #ifndef N2K_ENABLED
 #define N2K_ENABLED true
@@ -12,7 +14,7 @@
 class N2KWind
 {
 public:
-    N2KWind(n2k_source_change_handler on_src) : n2k(*N2K::get_instance(nullptr, on_src)), src(DEFAULT_N2K_SOURCE), no_stats(true), n2k_err(false)
+    N2KWind(n2k_msg_handler on_msg, n2k_source_change_handler on_src) : n2k(*N2K::get_instance(on_msg, on_src)), src(DEFAULT_N2K_SOURCE), no_stats(true), n2k_err(false)
     {
     }
 
@@ -22,6 +24,8 @@ public:
         {
             n2k.set_desired_source(src);
             n2k.add_pgn(130306L);
+            n2k.add_pgn(CORRECTION_PGN);
+            n2k.add_rx_pgn(128259L); // STW for the correction table
             n2k_device_info info;
             info.ModelSerialCode = N2K_MODEL_SERIAL_CODE;
             info.ProductCode = N2K_PRODUCT_CODE;
@@ -42,7 +46,8 @@ public:
         n2k.set_desired_source(src);
     }
 
-    void send_N2K(double awd_deg, double aws_kn, double ellipse)
+    // reference: PGN 130306 byte 5 (see wind_reference_byte)
+    void send_N2K(double awd_deg, double aws_kn, double ellipse, uint8_t reference)
     {
         if (N2K_ENABLED && isnan(awd_deg) == false && isnan(aws_kn) == false)
         {
@@ -54,13 +59,31 @@ public:
             msg.AddByte(0);
             msg.Add2ByteUDouble(KnotsToms(aws_kn),0.01);
             msg.Add2ByteUDouble(DegToRad(awd_deg),0.0001);
-            msg.AddByte((unsigned char)tN2kWindReference::N2kWind_Apparent);
+            msg.AddByte(reference);
             msg.Add2ByteUDouble(ellipse,0.01); // Custom data - this last two bytes are "reserved"
             
             n2k.send_msg(msg);
         }
     }
 
+    // Proprietary fast-packet PGN 130900 with the active correction table.
+    void send_correction_table(const correction_table &t)
+    {
+        if (N2K_ENABLED)
+        {
+            uint8_t buf[CORRECTION_MAX_PAYLOAD];
+            size_t len = encode_correction_table(t, N2K_MANIFACTURER_CODE, buf, sizeof(buf));
+            if (len == 0)
+                return;
+            tN2kMsg msg(n2k.get_source());
+            msg.SetPGN(CORRECTION_PGN);
+            msg.Priority = 7;
+            for (size_t i = 0; i < len; i++)
+                msg.AddByte(buf[i]);
+            bool ok = n2k.send_msg(msg);
+            Log::trace("[N2K] Correction table sent {%d bytes} {%s}\n", (int)len, ok ? "OK" : "KO");
+        }
+    }
 
     void loop(unsigned long milliseconds)
     {

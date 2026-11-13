@@ -63,6 +63,8 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #define MAIN_LOOP_PERIOD_LOW_FREQ 250L // (millis) regulates the main loop used to read sensors and interacts with N2K & BLE
 #define WIND_N2K_DATA_FREQ 500L // (millis) regulates how frequently send out wind info on the N2K bus
 #define STW_N2K_DATA_FREQ 1000L // (millis) regulates how frequently send out speed through water info on the N2K bus
+#define CORRECTION_TABLE_FIRST_BROADCAST 5000L // (millis) first PGN 130900 broadcast after boot
+#define CORRECTION_TABLE_BROADCAST_PERIOD 60000L // (millis) PGN 130900 repeat period
 #define CALIBRATION_SAMPLING_EXCLUSION_PERIOD 10000L // (millis) do not take samples for 10 seconds after restart (sample would be funny)
 #define CPU_FREQUENCY 80 // MHz (ESP32 default is 160). 80 is the lower value that makes the device operable
 #define SPEED_SENSING_PERIOD_MULTIPLIER 4 // The frequency is collected every N main loops to reduce noise (1 means every loop, 2 every two loops, etc...)
