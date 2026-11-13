@@ -3,6 +3,10 @@
 #include "DataAndConf.h"
 #include "Calibration.h"
 #include "BLEWind.h"
+#include "WindCorrection.h"
+#include "CorrectionPersistence.h"
+#include <stdlib.h>
+#include <math.h>
 
 struct CommandContext
 {
@@ -10,10 +14,28 @@ struct CommandContext
     configuration &conf;
     Calibration &cal;
     IBLEWind &ble;
+    correction_table &table;
+    CorrectionPersistence &tablePersistence;
+    table_changed_callback on_table_changed;
 
     bool write_conf()
     {
         return confPersistence.write(conf);
+    }
+
+    // Persists the edited copy; only then makes it the table and notifies.
+    // On a write failure the table is left as it was.
+    CommandResult commit_table(const correction_table &edited)
+    {
+        if (!tablePersistence.write(edited))
+        {
+            Log::trace("[CMD] Error writing correction table\n");
+            return CommandResult::WRITE_ERROR;
+        }
+        table = edited;
+        if (on_table_changed)
+            on_table_changed();
+        return CommandResult::SUCCESS;
     }
 };
 
@@ -129,7 +151,11 @@ CommandResult command_factory_reset(CommandContext &ctx, const char *command_val
 {
     Log::trace("[CMD] Reset calibration to default\n");
     ctx.conf.reset();
-    return ctx.write_conf() ? CommandResult::SUCCESS : CommandResult::WRITE_ERROR;
+    if (!ctx.write_conf())
+        return CommandResult::WRITE_ERROR;
+    correction_table empty;
+    correction_clear(empty);
+    return ctx.commit_table(empty);
 }
 
 CommandResult command_abort_calibration(CommandContext &ctx, const char *command_value)
@@ -234,9 +260,59 @@ CommandResult command_change_ble_name(CommandContext &ctx, const char *command_v
     return CommandResult::INVALID_FORMAT;
 }
 
+CommandResult command_table_enable(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CMD] Correction table enable {%s}\n", command_value);
+    if (command_value == nullptr || command_value[1] != 0 || (command_value[0] != '0' && command_value[0] != '1'))
+        return CommandResult::INVALID_FORMAT;
+    correction_table edited = ctx.table;
+    edited.enabled = (command_value[0] == '1') ? 1 : 0;
+    return ctx.commit_table(edited);
+}
+
+CommandResult command_table_upsert(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CMD] Correction table upsert {%s}\n", command_value);
+    correction_row row;
+    if (!parse_correction_row(command_value, row))
+        return CommandResult::INVALID_FORMAT;
+    correction_table edited = ctx.table;
+    if (!correction_upsert(edited, row))
+        return CommandResult::OUT_OF_RANGE; // row was valid, so the table is full
+    return ctx.commit_table(edited);
+}
+
+CommandResult command_table_delete(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CMD] Correction table delete {%s}\n", command_value);
+    if (command_value == nullptr || command_value[0] == 0)
+        return CommandResult::INVALID_FORMAT;
+    char *end = nullptr;
+    double tws = strtod(command_value, &end);
+    if (end == command_value || *end != 0 || !isfinite(tws))
+        return CommandResult::INVALID_FORMAT;
+    long tws_units = lround(tws * 10.0);
+    if (tws_units < 0 || tws_units > CORRECTION_MAX_TWS)
+        return CommandResult::OUT_OF_RANGE;
+    correction_table edited = ctx.table;
+    if (!correction_delete(edited, (uint16_t)tws_units))
+        return CommandResult::OUT_OF_RANGE;
+    return ctx.commit_table(edited);
+}
+
+CommandResult command_table_clear(CommandContext &ctx, const char *command_value)
+{
+    Log::trace("[CMD] Correction table clear\n");
+    correction_table edited;
+    correction_clear(edited);
+    return ctx.commit_table(edited);
+}
+
 #pragma endregion
 
-CommandHandler::CommandHandler(configuration &c, ConfPersistence &confPersistence, Calibration &cal, IBLEWind &b) : conf(c), confPersistence(confPersistence), calibration(cal), ble(b)
+CommandHandler::CommandHandler(configuration &c, ConfPersistence &confPersistence, Calibration &cal, IBLEWind &b,
+                               correction_table &t, CorrectionPersistence &tp, table_changed_callback cb)
+    : confPersistence(confPersistence), conf(c), calibration(cal), ble(b), table(t), tablePersistence(tp), on_table_changed(cb)
 {
     memset(commands, 0, sizeof(commands));
     commands['K'] = command_set_speed_adj; // Set speed adj
@@ -253,6 +329,10 @@ CommandHandler::CommandHandler(configuration &c, ConfPersistence &confPersistenc
     commands['D'] = command_toggle_debug; // enable/disable USB tracing
     commands['V'] = command_vane_type; // send vane type (0=ST50, 1=ST60)
     commands['N'] = command_change_ble_name; // change BLE device name
+    commands['C'] = command_table_enable; // correction table on/off (0/1)
+    commands['U'] = command_table_upsert; // correction table: upsert row
+    commands['Z'] = command_table_delete; // correction table: delete row by TWS
+    commands['Y'] = command_table_clear; // correction table: clear
 }
 
 CommandResult CommandHandler::exec_command(const char *value)
@@ -264,7 +344,7 @@ CommandResult CommandHandler::exec_command(const char *value)
         if (cmd)
         {
             const char *command_value = (value + sizeof(char)); // skip the first char (which is the command code)
-            CommandContext ctx = {confPersistence, conf, calibration, ble};
+            CommandContext ctx = {confPersistence, conf, calibration, ble, table, tablePersistence, on_table_changed};
             CommandResult res = cmd(ctx, command_value);
             return res;
         }

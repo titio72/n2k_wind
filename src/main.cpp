@@ -17,10 +17,13 @@
 #include "BLEWind.h"
 #include "N2kWind.hpp"
 #include "WindSystem.h"
+#include "WindCorrection.h"
+#include "CorrectionPersistence.h"
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src);
 bool on_calibration_complete(const Range &s_range, const Range &c_range);
 void on_ble_command(const char *command);
+void on_table_changed();
 
 #pragma region Global objects
 configuration conf;
@@ -34,7 +37,12 @@ Calibration calibration(on_calibration_complete);
 BLEWind ble_wind(on_ble_command);
 N2KWind n2k_wind(on_n2k_source);
 ConfPersistence confPersistence;
-CommandHandler cmd_handler(conf, confPersistence, calibration, ble_wind);
+// BLE commands (NimBLE task) edit table_edit and raise table_changed;
+// the main loop adopts it into table_active (see _loop).
+correction_table table_edit;
+CorrectionPersistence correctionPersistence;
+volatile bool table_changed = false;
+CommandHandler cmd_handler(conf, confPersistence, calibration, ble_wind, table_edit, correctionPersistence, on_table_changed);
 #pragma endregion
 
 // ESP32 hw timer callback
@@ -107,6 +115,11 @@ void do_log(const configuration &conf, const all_data &wdata, const Wind360 &cal
 void on_ble_command(const char *command)
 {
   CommandResult res = cmd_handler.exec_command(command);
+}
+
+void on_table_changed()
+{
+  table_changed = true;
 }
 
 void on_n2k_source(unsigned char old_src, unsigned char new_src)

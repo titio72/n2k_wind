@@ -7,6 +7,8 @@
 #include "Constants.h"
 #include "DataAndConf.h"
 #include "BLEWind.h"
+#include "WindCorrection.h"
+#include "CorrectionPersistence.h"
 #include <stdio.h>
 
 // ============================================================================
@@ -52,12 +54,46 @@ public:
     }
 };
 
-#define TEST_CONTEXT                     \
-    configuration conf;                           \
-    TestConfPersistence confPersistence; \
-    Calibration calib;                   \
-    MockBLEWind ble;                     \
-    CommandHandler handler(conf, confPersistence, calib, ble);
+/**
+ * Test double for the correction table EEPROM block: counts writes and can fail.
+ */
+class TestCorrectionPersistence : public CorrectionPersistence
+{
+public:
+    int writes = 0;
+    bool fail = false;
+
+    bool write(const correction_table &t) override
+    {
+        if (fail)
+            return false;
+        writes++;
+        return true;
+    }
+
+    bool read(correction_table &t) override
+    {
+        correction_clear(t);
+        return false;
+    }
+};
+
+static int table_changed_calls = 0;
+static void on_table_changed() { table_changed_calls++; }
+
+#define TEST_CONTEXT                                        \
+    configuration conf;                                     \
+    TestConfPersistence confPersistence;                    \
+    Calibration calib;                                      \
+    MockBLEWind ble;                                        \
+    correction_table table;                                 \
+    correction_clear(table);                                \
+    TestCorrectionPersistence tablePersistence;             \
+    table_changed_calls = 0;                                \
+    CommandHandler handler(conf, confPersistence, calib, ble, \
+                           table, tablePersistence, on_table_changed);
+
+#define ROW10 "U10.0,40,-3.5,0.0,95,-1.0,0.0,150,2.0,0.5"
 
 // ============================================================================
 // Input Validation Tests
@@ -91,7 +127,7 @@ void test_command_unknown(void)
 {
     TEST_CONTEXT
 
-    CommandResult result = handler.exec_command("Z");
+    CommandResult result = handler.exec_command("J");
     TEST_ASSERT_EQUAL(CommandResult::UNKNOWN_COMMAND, result);
 }
 
@@ -613,6 +649,119 @@ void test_command_manual_calibration_invalid(void)
     TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, result);
 }
 
+
+// ============================================================================
+// Correction table commands
+// ============================================================================
+
+void test_command_table_upsert(void)
+{
+    TEST_CONTEXT
+    TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command(ROW10));
+    TEST_ASSERT_EQUAL_UINT8(1, table.n_rows);
+    TEST_ASSERT_EQUAL_UINT16(100, table.rows[0].tws);
+    TEST_ASSERT_EQUAL_INT16(-35, table.rows[0].anchors[0].d_angle);
+    TEST_ASSERT_EQUAL_INT(1, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(1, table_changed_calls);
+}
+
+void test_command_table_enable(void)
+{
+    TEST_CONTEXT
+    TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command("C1"));
+    TEST_ASSERT_EQUAL_UINT8(1, table.enabled);
+    TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command("C0"));
+    TEST_ASSERT_EQUAL_UINT8(0, table.enabled);
+    TEST_ASSERT_EQUAL_INT(2, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(2, table_changed_calls);
+}
+
+void test_command_table_enable_invalid(void)
+{
+    TEST_CONTEXT
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("C2"));
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("C"));
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("C1x"));
+    TEST_ASSERT_EQUAL_UINT8(0, table.enabled);
+    TEST_ASSERT_EQUAL_INT(0, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(0, table_changed_calls);
+}
+
+void test_command_table_delete(void)
+{
+    TEST_CONTEXT
+    handler.exec_command(ROW10);
+    TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command("Z10.0"));
+    TEST_ASSERT_EQUAL_UINT8(0, table.n_rows);
+    TEST_ASSERT_EQUAL_INT(2, tablePersistence.writes);
+    TEST_ASSERT_EQUAL(CommandResult::OUT_OF_RANGE, handler.exec_command("Z12.0"));
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("Zabc"));
+    TEST_ASSERT_EQUAL_INT(2, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(2, table_changed_calls);
+}
+
+void test_command_table_clear(void)
+{
+    TEST_CONTEXT
+    handler.exec_command(ROW10);
+    handler.exec_command("C1");
+    TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command("Y"));
+    TEST_ASSERT_EQUAL_UINT8(0, table.n_rows);
+    TEST_ASSERT_EQUAL_UINT8(0, table.enabled);
+    TEST_ASSERT_EQUAL_INT(3, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(3, table_changed_calls);
+}
+
+void test_command_table_full_rejected(void)
+{
+    TEST_CONTEXT
+    char cmd[64];
+    for (int i = 1; i <= CORRECTION_MAX_ROWS; i++)
+    {
+        snprintf(cmd, sizeof(cmd), "U%d.0,40,-3.5,0.0,95,-1.0,0.0,150,2.0,0.5", i);
+        TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command(cmd));
+    }
+    correction_table before = table;
+    TEST_ASSERT_EQUAL(CommandResult::OUT_OF_RANGE, handler.exec_command("U50.0,40,-3.5,0.0,95,-1.0,0.0,150,2.0,0.5"));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &table, sizeof(table));
+    TEST_ASSERT_EQUAL_INT(CORRECTION_MAX_ROWS, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(CORRECTION_MAX_ROWS, table_changed_calls);
+}
+
+void test_command_table_invalid_row_rejected(void)
+{
+    TEST_CONTEXT
+    handler.exec_command(ROW10);
+    correction_table before = table;
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("U10.0,0,-3.5,0.0,95,-1.0,0.0,150,2.0,0.5"));
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("U10.0,40,-3.5"));
+    TEST_ASSERT_EQUAL(CommandResult::INVALID_FORMAT, handler.exec_command("U"));
+    TEST_ASSERT_EQUAL_MEMORY(&before, &table, sizeof(table));
+    TEST_ASSERT_EQUAL_INT(1, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(1, table_changed_calls);
+}
+
+void test_command_table_write_error_leaves_table(void)
+{
+    TEST_CONTEXT
+    tablePersistence.fail = true;
+    TEST_ASSERT_EQUAL(CommandResult::WRITE_ERROR, handler.exec_command(ROW10));
+    TEST_ASSERT_EQUAL_UINT8(0, table.n_rows);
+    TEST_ASSERT_EQUAL_INT(0, table_changed_calls);
+}
+
+void test_command_factory_reset_clears_table(void)
+{
+    TEST_CONTEXT
+    handler.exec_command(ROW10);
+    handler.exec_command("C1");
+    TEST_ASSERT_EQUAL(CommandResult::SUCCESS, handler.exec_command("X"));
+    TEST_ASSERT_EQUAL_UINT8(0, table.n_rows);
+    TEST_ASSERT_EQUAL_UINT8(0, table.enabled);
+    TEST_ASSERT_EQUAL_INT(3, tablePersistence.writes);
+    TEST_ASSERT_EQUAL_INT(3, table_changed_calls);
+}
+
 // ============================================================================
 // Run All Tests
 // ============================================================================
@@ -687,6 +836,17 @@ void setup(void)
     RUN_TEST(test_command_manual_calibration_valid);
     RUN_TEST(test_command_manual_calibration_incomplete);
     RUN_TEST(test_command_manual_calibration_invalid);
+
+    // Correction table tests
+    RUN_TEST(test_command_table_upsert);
+    RUN_TEST(test_command_table_enable);
+    RUN_TEST(test_command_table_enable_invalid);
+    RUN_TEST(test_command_table_delete);
+    RUN_TEST(test_command_table_clear);
+    RUN_TEST(test_command_table_full_rejected);
+    RUN_TEST(test_command_table_invalid_row_rejected);
+    RUN_TEST(test_command_table_write_error_leaves_table);
+    RUN_TEST(test_command_factory_reset_clears_table);
 
     UNITY_END();
 }

@@ -20,11 +20,18 @@ class Calibration;
 struct configuration;
 class ConfPersistence;
 class IBLEWind;
+struct correction_table;
+class CorrectionPersistence;
+
+// Called after an accepted, persisted change to the correction table.
+typedef void (*table_changed_callback)();
 
 class CommandHandler
 {
 public:
-    CommandHandler(configuration &conf, ConfPersistence& confPersistence, Calibration &cal, IBLEWind &ble);
+    CommandHandler(configuration &conf, ConfPersistence &confPersistence, Calibration &cal, IBLEWind &ble,
+                   correction_table &table, CorrectionPersistence &tablePersistence,
+                   table_changed_callback on_table_changed); // callback may be nullptr
 
     CommandResult exec_command(const char *value);
     
@@ -33,5 +40,8 @@ private:
     configuration &conf;
     Calibration &calibration;
     IBLEWind &ble;
+    correction_table &table;
+    CorrectionPersistence &tablePersistence;
+    table_changed_callback on_table_changed;
 };
 #endif
