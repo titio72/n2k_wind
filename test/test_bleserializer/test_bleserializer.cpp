@@ -437,6 +437,70 @@ void test_make_message_buffer_size(void) {
     TEST_ASSERT_TRUE(buf.size() > 0);
 }
 
+
+// ============================================================================
+// Correction status (appended after the Wind360 part)
+// ============================================================================
+
+static size_t correction_offset(const Calibration &calib)
+{
+    return 43 + 1 + calib.get_wind360().buffer_size() + 1;
+}
+
+void test_make_message_correction_status(void) {
+    configuration conf = create_default_config();
+    all_data data = create_default_data();
+    data.correction.table_id = 0x5330A1DE;
+    data.correction.enabled = 1;
+    data.correction.corrected = 1;
+    data.correction.awa = 38.2193;
+    data.correction.aws = 15.1701;
+
+    Calibration calib;
+    ByteBuffer buf(256);
+    make_message(conf, data, calib, buf);
+
+    size_t off = correction_offset(calib);
+    TEST_ASSERT_EQUAL_UINT32(off + 10, buf.length());
+    TEST_ASSERT_TRUE(buf.length() <= 128); // BLEWind buffer
+    TEST_ASSERT_EQUAL_HEX32(0x5330A1DE, get_uint32(buf, off));
+    TEST_ASSERT_EQUAL_UINT8(1, get_uint8(buf, off + 4));
+    TEST_ASSERT_EQUAL_UINT8(1, get_uint8(buf, off + 5));
+    TEST_ASSERT_EQUAL_UINT16(382, get_uint16(buf, off + 6));
+    TEST_ASSERT_EQUAL_UINT16(152, get_uint16(buf, off + 8));
+}
+
+void test_make_message_correction_status_nan(void) {
+    configuration conf = create_default_config();
+    all_data data = create_default_data();
+
+    Calibration calib;
+    ByteBuffer buf(256);
+    make_message(conf, data, calib, buf);
+
+    size_t off = correction_offset(calib);
+    TEST_ASSERT_EQUAL_HEX32(0, get_uint32(buf, off));
+    TEST_ASSERT_EQUAL_UINT8(0, get_uint8(buf, off + 4));
+    TEST_ASSERT_EQUAL_UINT8(0, get_uint8(buf, off + 5));
+    TEST_ASSERT_EQUAL_HEX16(0xFFFF, get_uint16(buf, off + 6));
+    TEST_ASSERT_EQUAL_HEX16(0xFFFF, get_uint16(buf, off + 8));
+}
+
+void test_make_message_correction_awa_wraps(void) {
+    configuration conf = create_default_config();
+    all_data data = create_default_data();
+    data.correction.awa = 359.97;
+    data.correction.aws = 0.0;
+
+    Calibration calib;
+    ByteBuffer buf(256);
+    make_message(conf, data, calib, buf);
+
+    size_t off = correction_offset(calib);
+    TEST_ASSERT_EQUAL_UINT16(0, get_uint16(buf, off + 6));
+    TEST_ASSERT_EQUAL_UINT16(0, get_uint16(buf, off + 8));
+}
+
 /**
  * Test: make_message with all fields populated
  */
@@ -520,6 +584,9 @@ int main(int argc, char **argv) {
     // ========== Integration Tests ==========
     RUN_TEST(test_make_message_buffer_size);
     RUN_TEST(test_make_message_full_data);
+    RUN_TEST(test_make_message_correction_status);
+    RUN_TEST(test_make_message_correction_status_nan);
+    RUN_TEST(test_make_message_correction_awa_wraps);
     
     return UNITY_END();
 }

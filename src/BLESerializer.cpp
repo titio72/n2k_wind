@@ -30,6 +30,9 @@ ByteBuffer& make_message(const configuration &conf, const all_data &wdata, const
     uint16_t i_speed = isnan(wdata.wind.speed) ? 0 : (uint16_t)(wdata.wind.speed * 10 + 0.5);
     uint16_t i_frequency = isnan(wdata.wind.frequency) ? 0 : (uint16_t)(wdata.wind.frequency * 100 + 0.5);
 
+    uint16_t i_corr_awa = isnan(wdata.correction.awa) ? 0xFFFF : (uint16_t)(((int32_t)(wdata.correction.awa * 10 + 0.5) % 3600 + 3600) % 3600);
+    uint16_t i_corr_aws = isnan(wdata.correction.aws) ? 0xFFFF : (uint16_t)(wdata.correction.aws * 10 + 0.5);
+
     buffer.reset();
     buffer << i_angle                   // 0
             << i_smooth_angle           // 2  
@@ -56,7 +59,13 @@ ByteBuffer& make_message(const configuration &conf, const all_data &wdata, const
             << (calib.is_calibration_valid()?YES:NO)    // 40
             << (calib.is_calibration_in_score()?YES:NO) // 41
             << (Log::is_enabled()?YES:NO)               // 42
-            << calib.get_wind360();                     // 43-56 The variable length part at the end
+            << calib.get_wind360()                      // 43-56 The variable length part
+            // correction status, after the variable part (offset 43 + 1 + wind360 buffer + 1)
+            << wdata.correction.table_id                // +0 u32
+            << wdata.correction.enabled                 // +4 u8
+            << wdata.correction.corrected               // +5 u8
+            << i_corr_awa                               // +6 u16 0.1 deg, 0xFFFF = n/a
+            << i_corr_aws;                              // +8 u16 0.1 kn, 0xFFFF = n/a
 
     return buffer;
 }

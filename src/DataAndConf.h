@@ -2,6 +2,7 @@
 #define _CONF_H
 
 #include <stdint.h>
+#include <math.h>
 #include "WindUtil.h"
 #include "WindCorrection.h"
 
@@ -70,6 +71,16 @@ struct wind_data
   uint8_t speed_error = WIND_ERROR_NO_SIGNAL;
 };
 
+// What the sensor did to the last N2K wind sample (BLE diagnostics).
+struct correction_status
+{
+  uint32_t table_id = 0;
+  uint8_t enabled = 0;
+  uint8_t corrected = 0;
+  double awa = NAN; // sent AWA, deg [0,360)
+  double aws = NAN; // sent AWS, kn
+};
+
 struct all_data
 {
   // system data
@@ -77,6 +88,7 @@ struct all_data
   unsigned long heap = 0;
 
   wind_data wind;
+  correction_status correction;
 
   double get_out_angle(const configuration &conf) const
   {
