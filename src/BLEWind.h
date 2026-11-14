@@ -6,6 +6,7 @@
 class Calibration;
 struct all_data;
 struct configuration;
+struct correction_table;
 
 typedef void (*on_command_callback)(const char *command);
 
@@ -27,6 +28,9 @@ public:
 
     void send_BLE(const configuration& conf, const all_data& wdata, const Calibration &calib);
 
+    // Sets the value of the table characteristic. Call after setup(), from the main loop.
+    void set_correction_table(const correction_table &t);
+
     void loop(unsigned long milli_seconds);
 
     bool is_alive() const;
@@ -40,6 +44,7 @@ private:
     int ble_command_handle = -1;
     int ble_conf_handle = -1;
     int ble_wind_data_handle = -1;
+    int ble_table_handle = -1;
     on_command_callback command_callback;
     unsigned long last_BT_is_alive = 0;
 };

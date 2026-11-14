@@ -5,6 +5,8 @@
 #include "../src/DataAndConf.h"
 #include "../src/Calibration.h"
 #include "../src/Constants.h"
+#include "../src/WindCorrection.h"
+#include "../src/CorrectionProtocol.h"
 
 // ============================================================================
 // Helper Functions
@@ -501,6 +503,57 @@ void test_make_message_correction_awa_wraps(void) {
     TEST_ASSERT_EQUAL_UINT16(0, get_uint16(buf, off + 8));
 }
 
+// ============================================================================
+// Correction table characteristic (same bytes as the PGN 130900 payload)
+// ============================================================================
+
+static correction_table make_t1()
+{
+    correction_table t;
+    correction_clear(t);
+    t.enabled = 1;
+    t.n_rows = 2;
+    t.rows[0] = {60, {{45, -60, 0}, {95, -40, 0}, {150, -20, 0}}};
+    t.rows[1] = {100, {{40, -35, 0}, {95, -10, 0}, {150, 20, 5}}};
+    return t;
+}
+
+static uint32_t le32(const uint8_t *p)
+{
+    return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
+}
+
+void test_make_table_message_t1(void) {
+    static const uint8_t T1_PAYLOAD[] = {
+        0xFE, 0x9F, 0x01, 0x01, 0xDE, 0xA1, 0x30, 0x53, 0x01, 0x02, 0x3C, 0x00, 0x2D, 0xC4, 0xFF,
+        0x00, 0x00, 0x5F, 0xD8, 0xFF, 0x00, 0x00, 0x96, 0xEC, 0xFF, 0x00, 0x00, 0x64, 0x00, 0x28,
+        0xDD, 0xFF, 0x00, 0x00, 0x5F, 0xF6, 0xFF, 0x00, 0x00, 0x96, 0x14, 0x00, 0x05, 0x00};
+    uint8_t buf[CORRECTION_MAX_PAYLOAD];
+    size_t n = make_table_message(make_t1(), buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(T1_PAYLOAD), n);
+    TEST_ASSERT_EQUAL_HEX8_ARRAY(T1_PAYLOAD, buf, sizeof(T1_PAYLOAD));
+}
+
+// Bytes 4-7 equal the table_id the data characteristic carries, so the app
+// can tell a stale or torn read from the current table.
+void test_make_table_message_crc_is_table_id(void) {
+    correction_table t = make_t1();
+    t.enabled = 0;
+    uint8_t buf[CORRECTION_MAX_PAYLOAD];
+    TEST_ASSERT_TRUE(make_table_message(t, buf, sizeof(buf)) > 0);
+    TEST_ASSERT_EQUAL_HEX32(correction_table_id(t), le32(buf + 4));
+}
+
+void test_make_table_message_empty(void) {
+    correction_table t;
+    correction_clear(t);
+    uint8_t buf[CORRECTION_MAX_PAYLOAD];
+    TEST_ASSERT_EQUAL_UINT32(10, make_table_message(t, buf, sizeof(buf)));
+    TEST_ASSERT_EQUAL_UINT8(0, buf[8]);
+    TEST_ASSERT_EQUAL_UINT8(0, buf[9]);
+    TEST_ASSERT_EQUAL_HEX32(0x41D912FF, le32(buf + 4));
+}
+
 /**
  * Test: make_message with all fields populated
  */
@@ -587,6 +640,9 @@ int main(int argc, char **argv) {
     RUN_TEST(test_make_message_correction_status);
     RUN_TEST(test_make_message_correction_status_nan);
     RUN_TEST(test_make_message_correction_awa_wraps);
+    RUN_TEST(test_make_table_message_t1);
+    RUN_TEST(test_make_table_message_crc_is_table_id);
+    RUN_TEST(test_make_table_message_empty);
     
     return UNITY_END();
 }

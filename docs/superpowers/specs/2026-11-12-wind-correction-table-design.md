@@ -111,6 +111,11 @@ Each accepted change is validated, persisted, gets a new `table_id`, and trigger
 
 BLE data: append `table_id`, the enabled flag, the corrected flag, and the corrected AWA/AWS to the end of the BLE data message (`BLESerializer.cpp`), after the variable-length Wind360 part. If the app can't take fields after a variable-length part, the builder may instead add a separate characteristic. The current layout stays byte-compatible for existing app versions.
 
+BLE table (added later, so the app can show the table): a read-only characteristic `table`, UUID `b0ff19bd-7c2d-4215-8cc0-2a6db52cdf4f`, holds the PGN 130900 payload byte for byte (10–180 bytes, layout below). The sensor sets it at boot and each time the main loop adopts a new table.
+- The app **reads** it; it does not subscribe. The link MTU is 128, so a notification would be cut at 125 bytes; a read of a longer value is a long read that Android performs on its own.
+- Bytes 4–7 (the CRC) equal the `table_id` in the data message. The app re-reads when `table_id` changes, and re-reads if the CRC of bytes 8..end doesn't match bytes 4–7 or `table_id` (a read that straddled a table change).
+- The value holds the table the sensor is *using*, so right after a `C`/`U`/`Z`/`Y` it can lag the command by one main-loop pass. Waiting for the new `table_id` covers this.
+
 ### PGN 130306: "corrected" flag
 
 Byte 5 (wind reference) stays exactly `0x02` (apparent), so standard equipment sees a normal 130306. (Revised: the flag first lived in byte 5's reserved bits, but equipment that compares the whole byte to 2 would have rejected the message.)

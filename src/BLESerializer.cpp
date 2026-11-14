@@ -1,6 +1,8 @@
 #include "BLESerializer.h"
 #include "DataAndConf.h"
 #include "Calibration.h"
+#include "Constants.h"
+#include "CorrectionProtocol.h"
 #include <Utils.h>
 #include <Log.h>
 
@@ -68,4 +70,9 @@ ByteBuffer& make_message(const configuration &conf, const all_data &wdata, const
             << i_corr_aws;                              // +8 u16 0.1 kn, 0xFFFF = n/a
 
     return buffer;
+}
+
+size_t make_table_message(const correction_table &t, uint8_t *buf, size_t buf_len)
+{
+    return encode_correction_table(t, N2K_MANIFACTURER_CODE, buf, buf_len);
 }

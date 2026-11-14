@@ -4,6 +4,7 @@
 #include "DataAndConf.h"
 #include "Calibration.h"
 #include "BLESerializer.h"
+#include "CorrectionProtocol.h"
 #include <Utils.h>
 
 #define MAX_BLE_DATA_BUFFER_SIZE 128
@@ -24,6 +25,9 @@ void BLEWind::setup()
     ble_command_handle = bt.add_setting(BLE_COMMAND_CHARACTERISTIC_NAME, BLE_COMMAND_UUID);
     ble_conf_handle = bt.add_setting(BLE_CONF_CHARACTERISTIC_NAME, BLE_CONF_UUID);
     ble_wind_data_handle = bt.add_field(BLE_DATA_CHARACTERISTIC_NAME, BLE_WIND_DATA_UUID);
+    // notify, not indicate: set_correction_table() must not wait for an ack
+    // (nobody is expected to subscribe, see BLE_TABLE_UUID)
+    ble_table_handle = bt.add_field(BLE_TABLE_CHARACTERISTIC_NAME, BLE_TABLE_UUID, true);
     bt.setup();
     bt.begin();
 }
@@ -44,6 +48,17 @@ void BLEWind::send_BLE(const configuration& conf, const all_data &wdata, const C
     {
         bt.set_field_value(ble_wind_data_handle, buffer.data(), buffer.length());
     }
+}
+
+void BLEWind::set_correction_table(const correction_table &t)
+{
+    // Set whether or not anybody is connected: it is read, not streamed.
+    uint8_t payload[CORRECTION_MAX_PAYLOAD];
+    size_t len = make_table_message(t, payload, sizeof(payload));
+    if (len == 0)
+        Log::trace("[BLE] Correction table does not fit\n");
+    else
+        bt.set_field_value(ble_table_handle, payload, (int)len);
 }
 
 void BLEWind::loop(unsigned long milli_seconds)

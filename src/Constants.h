@@ -74,10 +74,14 @@ Raymarine says that 20Hz (10Hz considering a full revolution) is 20Knots, which 
 #define BLE_COMMAND_UUID "c3fe2075-ac6c-40bf-8073-73a110453725"
 #define BLE_CONF_UUID "c04a9b9c-3ab6-4cce-9b59-1b582112e693"
 #define BLE_WIND_DATA_UUID "003d0cab-70f7-43ac-8ab9-db26466572af"
+// Correction table, PGN 130900 payload (10..180 bytes). Read it (long read):
+// a notification is cut at MTU-3 = 125 bytes, so don't subscribe.
+#define BLE_TABLE_UUID "b0ff19bd-7c2d-4215-8cc0-2a6db52cdf4f"
 #define BLE_DEVICE_NAME "Wind"
 #define BLE_COMMAND_CHARACTERISTIC_NAME "command"
 #define BLE_DATA_CHARACTERISTIC_NAME "data"
 #define BLE_CONF_CHARACTERISTIC_NAME "conf"
+#define BLE_TABLE_CHARACTERISTIC_NAME "table"
 #define BLE_ACTIVITY_TIMEOUT 30000L // (millis) time after which we consider that the connection is dead if no command is received
 
 // The reading gives sin and cos, and sqrt(sin^2+cos^2 )must be equal to 1.0, or close to it. Large differences means that the linearization

@@ -87,7 +87,8 @@ void _setup()
 
   // initialize ble
   ble_wind.set_device_name(conf.ble_name);
-  ble_wind.setup();  
+  ble_wind.setup();
+  ble_wind.set_correction_table(table_active);
 
   Log::trace("[APP] Setup done\n");
 }
@@ -168,6 +169,7 @@ void manage_correction_table(unsigned long t_ms)
     table_id = correction_table_id(table_active);
     Log::trace("[CORR] New table id {%08x} enabled {%d} rows {%d}\n", table_id, table_active.enabled, table_active.n_rows);
     n2k_wind.send_correction_table(table_active);
+    ble_wind.set_correction_table(table_active);
     broadcast_done = true;
     last_broadcast = t_ms;
   }
