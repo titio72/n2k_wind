@@ -52,13 +52,14 @@ void BLEWind::send_BLE(const configuration& conf, const all_data &wdata, const C
 
 void BLEWind::set_correction_table(const correction_table &t)
 {
-    // Set whether or not anybody is connected: it is read, not streamed.
+    // Set whether or not anybody is connected. It is read, not streamed: pushing it makes the
+    // stack send it on the live connection, and the data indications stop on that connection.
     uint8_t payload[CORRECTION_MAX_PAYLOAD];
     size_t len = make_table_message(t, payload, sizeof(payload));
     if (len == 0)
         Log::trace("[BLE] Correction table does not fit\n");
     else
-        bt.set_field_value(ble_table_handle, payload, (int)len);
+        bt.store_field_value(ble_table_handle, payload, (int)len);
 }
 
 void BLEWind::loop(unsigned long milli_seconds)
